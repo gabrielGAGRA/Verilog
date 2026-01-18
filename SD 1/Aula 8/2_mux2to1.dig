@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<circuit>
+  <version>2</version>
+  <attributes/>
+  <visualElements>
+    <visualElement>
+      <elementName>ExternalFile</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>mux2to1</string>
+        </entry>
+        <entry>
+          <string>applicationType</string>
+          <appType>IVERILOG</appType>
+        </entry>
+        <entry>
+          <string>externalInputs</string>
+          <string>a,b,sel</string>
+        </entry>
+        <entry>
+          <string>externalOutputs</string>
+          <string>y</string>
+        </entry>
+        <entry>
+          <string>CodeFile</string>
+          <file>/home/balbertini/GIT/gitlab.usp.br/pcs3115/exercicios/a08_verilog/2_mux2to1.v</file>
+        </entry>
+      </elementAttributes>
+      <pos x="260" y="120"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>B</string>
+        </entry>
+      </elementAttributes>
+      <pos x="200" y="140"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>sel</string>
+        </entry>
+      </elementAttributes>
+      <pos x="200" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>A</string>
+        </entry>
+      </elementAttributes>
+      <pos x="200" y="100"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Y</string>
+        </entry>
+      </elementAttributes>
+      <pos x="340" y="140"/>
+    </visualElement>
+  </visualElements>
+  <wires>
+    <wire>
+      <p1 x="220" y="160"/>
+      <p2 x="260" y="160"/>
+    </wire>
+    <wire>
+      <p1 x="200" y="100"/>
+      <p2 x="220" y="100"/>
+    </wire>
+    <wire>
+      <p1 x="200" y="180"/>
+      <p2 x="220" y="180"/>
+    </wire>
+    <wire>
+      <p1 x="220" y="120"/>
+      <p2 x="260" y="120"/>
+    </wire>
+    <wire>
+      <p1 x="200" y="140"/>
+      <p2 x="260" y="140"/>
+    </wire>
+    <wire>
+      <p1 x="320" y="140"/>
+      <p2 x="340" y="140"/>
+    </wire>
+    <wire>
+      <p1 x="220" y="100"/>
+      <p2 x="220" y="120"/>
+    </wire>
+    <wire>
+      <p1 x="220" y="160"/>
+      <p2 x="220" y="180"/>
+    </wire>
+  </wires>
+  <measurementOrdering/>
+</circuit>

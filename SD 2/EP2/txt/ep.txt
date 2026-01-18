@@ -1,0 +1,522 @@
+module pc_calculator
+#(parameter XLEN = 32)
+(       input [XLEN-1:0]	imm,
+	    input [XLEN-1:0]	rs1,
+        input [XLEN-1:0]    pc_old,
+	    input [1:0] sel_pc_addr,
+        output [XLEN-1:0]   pc_addr
+);
+    wire [XLEN-1:0] pc_plus4;
+    assign pc_plus4 = pc_old+4;
+  assign pc_addr = (sel_pc_addr == 0) ? pc_plus4:
+	            (sel_pc_addr == 1) ? pc_old+imm:
+		        (sel_pc_addr == 2) ? rs1+imm: 0;
+   
+endmodule // pc_calculator
+
+module registerfile
+  #(parameter W = 32)
+(
+  input  [4  :0] Read1, Read2, WriteReg,
+  input  [W-1:0] WriteData,
+  input  RegWrite, clk,
+  output [W-1:0] Data1, Data2
+);
+
+    reg [W-1:0] registers [31:0];
+
+    assign Data1 = (Read1 == 0) ? 0 : registers[Read1];
+    assign Data2 = (Read2 == 0) ? 0 : registers[Read2];
+
+    always @(posedge clk) begin
+        if (RegWrite != 0) begin
+            if (WriteReg != 0)
+            registers[WriteReg] <= WriteData;
+        end
+    end
+
+endmodule
+
+module alu
+
+  #(parameter W = 32)
+(
+  input  [3:0]   ALUctl,
+  input signed[W-1:0] A, B,
+  output signed [W-1:0] ALUout,
+  output Zero,
+  output lt,
+  output ltu
+);
+
+    //wire [w-1:0] result;
+    parameter ADD  = 4'b0010,
+                SUB  = 4'b0110,
+                XOR  = 4'b1000,
+                OR  = 4'b0001,                  
+                AND  = 4'b0000,
+                SLL  = 4'b0011,
+                SRL  = 4'b0100,
+                SRA  = 4'b0101,
+                SRAI = 4'b1001,
+                SLT  = 4'b0111,
+                SLTU = 4'b1111;
+
+
+    assign ALUout = (ALUctl == ADD) ? A + B :
+                    (ALUctl == SUB) ? A - B:
+                    (ALUctl == XOR) ? A ^ B:
+                    (ALUctl == OR) ? A | B :
+                    (ALUctl == AND) ?  A & B:
+                    (ALUctl == SLL) ? A << B[4:0]:
+                    (ALUctl == SRL) ? A >> B[4:0]:
+                    (ALUctl == SRA) ? A >>> B[4:0]://(A[31] == 0) ? $signed(A) >>> B[4:0]: (~((~A+1) >>> (B[4:0]))+1): //casting correto
+                    (ALUctl == SLT) ? (($signed(A) < $signed(B)) ? 1: 0):
+                    // Verificar comportamento
+                    (ALUctl == SLTU) ? (($unsigned(A) < $unsigned(B)) ? 1: 0): 0; 
+
+    assign Zero = (ALUout == 0) ? 1 : 0;
+    assign lt = (A < B);
+    assign ltu = ($unsigned(A) < $unsigned(B));
+
+
+endmodule
+
+
+module pc
+#(parameter W = 32)
+(input clk, input rst, input [1:0] pcsrc, input [W-1:0] imm, input [W-1:0] rs1, output [W-1:0] pc_in, output [W-1:0] pc_out);
+    
+    reg [W-1:0]internal_pc = -4;
+    assign pc_out = internal_pc;
+
+    assign pc_in =  (pcsrc == 0) ? internal_pc + 4:
+                    (pcsrc == 1) ? internal_pc + imm: 
+                    (pcsrc == 2) ? rs1 + imm: internal_pc;  
+
+    always @(posedge clk or posedge rst) begin
+        if (rst == 1'b1)
+            internal_pc <= 0;
+        else
+            internal_pc <= pc_in;
+    end 
+
+    initial begin
+        internal_pc <= 0;
+    end
+
+endmodule
+
+module imm_gen
+#(parameter XLEN=32)
+(input [XLEN-1:0] instr, output [XLEN-1:0] imm);
+
+    parameter   R=7'b011011,
+                I=7'b0010011,
+                S=7'b0100011,
+                B=7'b1100011,
+                J=7'b1101111,
+                JALR=7'b1100111,
+                LUI=7'b0110111,
+                AUIPC=7'b0010111,
+                LOAD = 7'b0000011;
+
+    assign imm =    (instr[6:0] == I) ? {{21{instr[31]}},instr[31:20]}: 
+                    (instr[6:0] == S) ? {{21{instr[31]}},instr[31:25],instr[11:7]}: 
+                    (instr[6:0] == B) ? {{20{instr[31]}},instr[31],instr[7],instr[30:25],instr[11:8],1'b0}: 
+                    (instr[6:0] == J) ? {{12{instr[31]}}, instr[19:12], instr[20], instr[30:21], 1'b0}:
+                    (instr[6:0] == JALR) ? {instr[31],instr[31:20]}:
+                    (instr[6:0] == LUI) ? {instr[31:12], 12'b0}:
+                    (instr[6:0] == AUIPC) ? {instr[31:12], 12'b0}:
+                    (instr[6:0] == LOAD) ? {{21{instr[31]}},instr[31:20]}: 0;
+
+        //J:
+           
+
+endmodule
+
+module writeback
+#(parameter XLEN=32)
+    (input Mem2reg, 
+    input [XLEN-1:0] memory_in, 
+    input [XLEN-1:0] alu_in, 
+    input [XLEN-1:0] pc, 
+    input [XLEN-1:0] imm, 
+    input [1:0] pc_val2rd, 
+    input [2:0] load_type,
+    output [XLEN-1:0] writeback_data);
+
+    wire [XLEN-1:0] memory_out;
+    //Load Types: 0: lb, 1: lh, 2: lw, 4: lbu, 5: lhu
+    parameter [2:0] lb = 3'b000, lh = 3'b001, lw = 3'b010, lbu = 3'b100, lhu =3'b101;
+    assign memory_out = (load_type == lb) ? {{XLEN-8{memory_in[7]}},memory_in[7:0]}
+            :
+                (load_type == lbu) ? {{XLEN-8{1'b0}},memory_in[7:0]}
+            :
+                (load_type == lh) ? {{XLEN-16{memory_in[15]}},memory_in[15:0]}
+            :
+                (load_type == lhu ) ? {{XLEN-16{1'b0}},memory_in[15:0]}
+            :
+                (load_type == lw ) ? memory_in
+            : 
+                 memory_in;
+
+
+
+    assign writeback_data = (pc_val2rd == 3) ? imm+pc:
+                            (pc_val2rd == 2) ? imm:
+                            (pc_val2rd == 1) ? pc+4:
+                           
+                            (Mem2reg) ? memory_out: alu_in;
+
+endmodule 
+
+module alu_control (
+    input [1:0] ALUOp,
+    input funct7bit5,
+    input [2:0] funct3,
+    output reg [3:0] ALUCtrl
+);
+
+always @(*) begin
+    case (ALUOp)
+      2'b00: ALUCtrl <= 4'b0010; // add for load, store and U-Type instructions
+      2'b01: ALUCtrl <= 4'b0110; // sub for branch instructions
+      2'b10: // R type instructions
+        begin
+              case ({funct7bit5,funct3})
+                  4'b0000 : ALUCtrl <= 4'b0010; // add
+                  4'b1000 : ALUCtrl <= 4'b0110; // sub
+                  4'b0100 : ALUCtrl <= 4'b1000; // xor
+                  4'b0110 : ALUCtrl <= 4'b0001; // or
+                  4'b0111 : ALUCtrl <= 4'b0000; // and
+                  4'b0001 : ALUCtrl <= 4'b0011; // sll
+                  4'b0101 : ALUCtrl <= 4'b0100; // srl
+                  4'b1101 : ALUCtrl <= 4'b0101; // sra
+                  4'b0010 : ALUCtrl <= 4'b0111; // slt
+                  4'b0011 : ALUCtrl <= 4'b1111; // sltu
+                default : ALUCtrl <= 4'bxxxx;
+              endcase
+        end
+      2'b11: // I type instructions
+        begin
+              case (funct3)
+              3'b000 : ALUCtrl <= 4'b0010; // addi
+              3'b100 : ALUCtrl <= 4'b1000; // xori
+              3'b110 : ALUCtrl <= 4'b0001; // ori
+              3'b111 : ALUCtrl <= 4'b0000; // andi
+              3'b001 : ALUCtrl <= 4'b0011; // slli
+              3'b101 : begin 
+                        ALUCtrl <= (funct7bit5 == 1'b0) ? 4'b0100: // srli
+                        4'b0101; // srai
+              end
+                 // srai //1
+              3'b010 : ALUCtrl <= 4'b0111; // slti
+              3'b011 : ALUCtrl <= 4'b1111; // sltiu
+                default : ALUCtrl <= 4'bxxxx;
+              endcase
+        end
+    endcase
+end
+    
+endmodule
+
+module control( input [31:0] instruction,
+                input clk,
+                input Zero,
+                input lt,
+                input ltu,
+                output reg branch,
+                output reg mem2reg,
+                output reg memwrite,
+                output reg memread,
+                output reg alusrc,
+                output reg regwrite,
+                output reg [1:0] pcsrc,
+                output [3:0] aluctl,
+                output reg [1:0] pc_val2rd,
+                output reg [1:0] sel_pc_addr,
+                output [2:0] load_type,
+                output [1:0] store_type
+                );
+
+    //Load Types: 0: lb, 1: lh, 2: lw, 3: lbu, 4: lhu
+    parameter [2:0] lb = 3'b001, lh = 3'b010, lw = 3'b011, lbu = 3'b100, lhu =3'b101;
+
+    parameter   r = 7'b0110011,
+                i = 7'b0010011,
+                l = 7'b0000011,
+                st = 7'b0100011,
+                b = 7'b1100011,
+                jalr = 7'b1100111,
+                jal = 7'b1101111,
+                lui = 7'b0110111,
+                auipc = 7'b0010111,
+                beq = 3'b000,
+                bne = 3'b001,
+                blt = 3'b100,
+                bge = 3'b101,
+                bltu = 3'b110,
+                bgeu = 3'b111;
+
+    wire [6:0] opcode;
+    wire [2:0] funct3;
+    wire [6:0] funct7;
+    assign opcode = instruction[6:0];
+    assign funct3 = instruction[14:12];
+    assign funct7 = instruction[31:25];
+    assign load_type = funct3;
+    assign store_type = funct3;
+
+    reg [1:0] aluop;
+
+    alu_control alu_control( .ALUOp(aluop),
+    .funct7bit5(instruction[30]),
+    .funct3(instruction[14:12]),
+    .ALUCtrl(aluctl));
+
+
+    always @(posedge clk, opcode, Zero) begin
+        case (opcode)
+            r: begin
+                aluop       <= 2'b10;
+                alusrc      <= 1'b0;
+                regwrite    <= 1'b1;
+                mem2reg     <= 1'b0;
+                memwrite    <= 1'b0;
+                memread     <= 1'b0;
+                branch      <= 1'b0;
+                pcsrc       <= 2'b00;
+                pc_val2rd   <= 2'b00;
+            end
+            i: begin
+                aluop       <= 2'b11;
+                alusrc      <= 1'b1;
+                regwrite    <= 1'b1;
+                mem2reg     <= 1'b0;
+                memwrite    <= 1'b0;
+                branch      <= 1'b0;
+                pcsrc       <= 2'b00;
+                sel_pc_addr <= 2'b00;
+                pc_val2rd   <= 2'b00;
+                memread     <= 1'b0;
+
+                
+
+
+            end
+            l: begin
+                aluop      <= 2'b00;
+                alusrc      <= 1'b1;
+                regwrite    <= 1'b1;
+                mem2reg     <= 1'b1;
+                memwrite    <= 1'b0;
+                branch      <= 1'b0;
+                pcsrc       <= 2'b00;
+                sel_pc_addr <= 2'b00;
+                pc_val2rd   <= 2'b00;
+                memread <= ~memwrite;
+
+            end
+            st: begin
+                aluop      <= 2'b00;
+                alusrc      <= 1'b1;
+                regwrite    <= 1'b0;
+                mem2reg     <= 1'b1;
+                memwrite    <= 1'b1;
+                branch      <= 1'b0;
+                pcsrc       <= 2'b00;
+                sel_pc_addr <= 2'b00;
+                pc_val2rd   <= 2'b00;
+                memread <= 1'b0;
+                //sb = 2'b00, sh = 2'b01, sw = 2'b10;
+
+               
+            end
+            b: begin
+                aluop      <= 2'b01;
+                alusrc      <= 1'b0;
+                regwrite    <= 1'b0;
+                mem2reg     <= 1'b0;
+                memwrite    <= 1'b0;
+                branch      <= 1'b1;
+                // Testar todos esses branchs
+                case (funct3)
+                    beq:
+                        pcsrc <= (Zero == 1'b1) ? 2'b01: 2'b00;
+                    bne:
+                        pcsrc <= (Zero != 1'b1) ? 2'b01: 2'b00;
+                    blt:
+                        pcsrc <= (lt == 1'b1) ? 2'b01: 2'b00;
+                    bge:
+                        pcsrc <= (lt != 1'b1) ? 2'b01: 2'b00;
+                    bltu:
+                        pcsrc <= (ltu == 1'b1) ? 2'b01: 2'b00;
+                    bgeu:
+                        pcsrc <= (ltu != 1'b1) ? 2'b01: 2'b00;
+                    default:
+                        pcsrc <= 2'b00;
+                endcase
+                
+        
+                //pcsrc       <= (Zero == 1) ? 2'b01: 2'b00;
+                pc_val2rd   <= 2'b00;
+                memread <= 1'b0;
+
+
+
+            end
+            jal: begin
+                aluop      <= 2'b00;
+                alusrc      <= 1'b1;
+                regwrite    <= 1'b1;
+                mem2reg     <= 1'b0;
+                memwrite    <= 1'b0;
+                branch      <= 1'b1;
+                pcsrc       <= 2'b01;
+                pc_val2rd   <= 2'b01;
+                memread <= 1'b0;
+	       
+
+            end
+            jalr: begin
+                aluop      <= 2'b00;
+                alusrc      <= 1'b1;
+                regwrite    <= 1'b1;
+                mem2reg     <= 1'b0;
+                memwrite    <= 1'b0;
+                branch      <= 1'b1;
+                pcsrc       <= 2'b10;
+                pc_val2rd   <= 2'b01;
+                memread <= 1'b0;
+
+            end
+            lui: begin
+                aluop      <= 2'b00;
+                alusrc      <= 1'b0;
+                regwrite    <= 1'b1;
+                mem2reg     <= 1'b0;
+                memwrite    <= 1'b0;
+                branch      <= 1'b0;
+                pcsrc       <= 2'b00;
+                pc_val2rd <= 2'b10;
+                memread <= 1'b0;
+            end
+            auipc: begin
+                aluop      <= 2'b00;
+                alusrc      <= 1'b1;
+                regwrite    <= 1'b1;
+                mem2reg     <= 1'b0;
+                memwrite    <= 1'b0;
+                branch      <= 1'b1;
+                pcsrc       <= 2'b00;
+                sel_pc_addr <= 2'b00;   
+                pc_val2rd <= 2'b11;
+                memread <= 1'b0;
+            end
+            default: begin
+                aluop      <= 2'b01;
+                alusrc      <= 1'b0;
+                regwrite    <= 1'b0;
+                mem2reg     <= 1'b0;
+                memwrite    <= 1'b0;
+                branch      <= 1'b0;
+                pcsrc       <= 2'b00;
+                sel_pc_addr <= 2'b00;
+                pc_val2rd <= 2'b00;
+                memread <= 1'b0;
+
+
+            end
+        endcase
+    end
+
+            
+
+endmodule
+
+module poliriscv_sc32 #(
+parameter instructions = 1024, // Number o f i n s t r u c t i o n s (32 b i t s each )
+parameter datawords = 1024 // Number o f words (32 b i t s each )
+) (
+input clk , rst ,
+input [31:0] IM_data , DM_data_i ,
+output [$clog2( instructions*4 )-1:0] IM_address , DM_address ,
+output [31:0] DM_data_o ,
+output DM_write_enable
+);
+parameter XLEN=32;
+
+ wire [XLEN-1:0] pc_in, pc_out;
+    wire [31:0] instr; 
+    wire [XLEN-1:0] rs1_data, rs2_data;
+    wire [XLEN-1:0] writeback_data;
+    wire [XLEN-1:0] ALUout, alu_in1, alu_in2;
+    wire [XLEN-1:0] imm;
+    wire Zero;
+    wire [4*$clog2(datawords)-1:0] data_addr;
+    wire [XLEN-1:0] IM_data_i;
+
+    assign data_addr = ALUout[15:0];
+    assign DM_address = data_addr;
+    assign DM_write_enable = memwrite;
+
+    wire branch, mem2reg, alusrc, regwrite,  memread, memwrite;
+    wire [1:0] pcsrc;
+    wire [3:0] aluctl;
+    assign alu_in2 = (alusrc == 1) ? imm: rs2_data;
+
+    control control(.instruction(instr),
+                .clk(clk),
+                .branch(branch),
+                .mem2reg(mem2reg),
+                .memwrite(memwrite),
+                .memread(memread),
+                .alusrc(alusrc),
+                .regwrite(regwrite),
+                .pcsrc(pcsrc),
+                .aluctl(aluctl),
+                .Zero(Zero),
+                .lt(lt_sig),
+                .ltu(ltu_sig),
+                .sel_pc_addr(sel_pc_addr),
+                .pc_val2rd(pc_val2rd),
+                .load_type(load_type),
+                .store_type(store_type)
+                );
+
+    integer fd;
+
+    wire [31:0] pc;
+    wire [1:0] pc_val2rd;
+    wire [1:0] sel_pc_addr;
+    wire [XLEN-1:0] branch_addr;
+    wire lt_sig, ltu_sig;
+    wire [2:0] load_type;
+    wire [1:0] store_type;
+    wire [XLEN-1:0] rfi_wd;
+    wire [4:0] rfi_rd;
+    assign pc = pc_out;
+   
+    assign IM_address = pc_out;
+    assign instr = IM_data;
+    assign rfi_wd = writeback_data;
+    assign rfi_rd = instr[11:7];
+
+   
+    //sb = 2'b00, sh = 2'b01, sw = 2'b10;
+    assign DM_data_o =  (store_type == 2'b00) ?  {{XLEN-8{1'b0}},rs2_data[7:0]}:
+                        (store_type == 2'b01) ? {{XLEN-16{1'b0}},rs2_data[15:0]}:
+                        (store_type == 2'b10) ? rs2_data: rs2_data;
+             
+
+    pc pc_module(.clk(clk), .rst(rst), .pcsrc(pcsrc), .imm(imm), .rs1(alu_in1), .pc_in(pc_in), .pc_out(pc_out));
+    registerfile registerfile(.Read1(instr[19:15]), 
+    .Read2(instr[24:20]), .WriteReg(instr[11:7]), .WriteData(writeback_data), .RegWrite(regwrite), .clk(clk), .Data1(alu_in1), .Data2(rs2_data));
+
+    alu alu(.ALUctl(aluctl), .A(alu_in1), .B(alu_in2), .ALUout(ALUout), .Zero(Zero), .lt(lt_sig), .ltu(ltu_sig));
+    imm_gen imm_gen(.instr(instr), .imm(imm));
+    writeback writeback(.Mem2reg(mem2reg), .memory_in(DM_data_i), .pc(pc), .imm(imm), .pc_val2rd(pc_val2rd),.alu_in(ALUout), .load_type(load_type),.writeback_data(writeback_data));
+
+
+endmodule

@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<circuit>
+  <version>2</version>
+  <attributes/>
+  <visualElements>
+    <visualElement>
+      <elementName>ExternalFile</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>somador2b_rc</string>
+        </entry>
+        <entry>
+          <string>applicationType</string>
+          <appType>IVERILOG</appType>
+        </entry>
+        <entry>
+          <string>externalInputs</string>
+          <string>a:4,b:4,cin</string>
+        </entry>
+        <entry>
+          <string>externalOutputs</string>
+          <string>sum:4,cout</string>
+        </entry>
+        <entry>
+          <string>CodeFile</string>
+          <file>/home/balbertini/GIT/gitlab.usp.br/pcs3115/exercicios/a08_verilog/3_somador4b_rc.v</file>
+        </entry>
+      </elementAttributes>
+      <pos x="220" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>B</string>
+        </entry>
+        <entry>
+          <string>Bits</string>
+          <int>4</int>
+        </entry>
+      </elementAttributes>
+      <pos x="140" y="200"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>A</string>
+        </entry>
+        <entry>
+          <string>Bits</string>
+          <int>4</int>
+        </entry>
+      </elementAttributes>
+      <pos x="140" y="160"/>
+    </visualElement>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Cin</string>
+        </entry>
+      </elementAttributes>
+      <pos x="140" y="240"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>sum</string>
+        </entry>
+        <entry>
+          <string>Bits</string>
+          <int>4</int>
+        </entry>
+      </elementAttributes>
+      <pos x="360" y="180"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Out</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Cout</string>
+        </entry>
+      </elementAttributes>
+      <pos x="360" y="220"/>
+    </visualElement>
+  </visualElements>
+  <wires>
+    <wire>
+      <p1 x="140" y="160"/>
+      <p2 x="160" y="160"/>
+    </wire>
+    <wire>
+      <p1 x="140" y="240"/>
+      <p2 x="160" y="240"/>
+    </wire>
+    <wire>
+      <p1 x="160" y="180"/>
+      <p2 x="220" y="180"/>
+    </wire>
+    <wire>
+      <p1 x="280" y="180"/>
+      <p2 x="360" y="180"/>
+    </wire>
+    <wire>
+      <p1 x="140" y="200"/>
+      <p2 x="220" y="200"/>
+    </wire>
+    <wire>
+      <p1 x="280" y="200"/>
+      <p2 x="340" y="200"/>
+    </wire>
+    <wire>
+      <p1 x="160" y="220"/>
+      <p2 x="220" y="220"/>
+    </wire>
+    <wire>
+      <p1 x="340" y="220"/>
+      <p2 x="360" y="220"/>
+    </wire>
+    <wire>
+      <p1 x="160" y="160"/>
+      <p2 x="160" y="180"/>
+    </wire>
+    <wire>
+      <p1 x="160" y="220"/>
+      <p2 x="160" y="240"/>
+    </wire>
+    <wire>
+      <p1 x="340" y="200"/>
+      <p2 x="340" y="220"/>
+    </wire>
+  </wires>
+  <measurementOrdering/>
+</circuit>

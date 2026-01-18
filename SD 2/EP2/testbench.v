@@ -1,0 +1,146 @@
+`timescale 1ns/1ps
+
+module testbench;
+    // Parâmetros de simulação
+    localparam CLK_PERIOD       = 10;
+    localparam INSTRUCTIONS     = 1024;
+    localparam DATAWORDS        = 1024;
+    localparam HALT_CYCLES_THR  = 10;
+    localparam TIMEOUT_CYCLES   = 2000;
+
+    // Sinais de controle e interface
+    reg clk;
+    reg rst;
+    reg [31:0] IM_data_from_mem;
+    reg [31:0] DM_data_from_mem;
+    wire [$clog2(INSTRUCTIONS*4)-1:0] IM_address_to_mem;
+    wire [$clog2(DATAWORDS*4)-1:0]  DM_address_to_mem;
+    wire [31:0] DM_data_to_mem;
+    wire        DM_write_enable_to_mem;
+    wire [31:0] pc, pc_in, ALUout, rfi_wd;
+    wire [4:0]  rfi_rd;
+
+    // Instanciação do Processador
+    poliriscv_sc32 #(
+        .instructions(INSTRUCTIONS),
+        .datawords(DATAWORDS)
+    ) dut (
+        .clk(clk), .rst(rst), .IM_data(IM_data_from_mem), .DM_data_i(DM_data_from_mem),
+        .IM_address(IM_address_to_mem), .DM_address(DM_address_to_mem),
+        .DM_data_o(DM_data_to_mem), .DM_write_enable(DM_write_enable_to_mem),
+        .pc(pc), .pc_in(pc_in), .ALUout(ALUout), .rfi_wd(rfi_wd), .rfi_rd(rfi_rd)
+    );
+
+    // Memória de Instruções (carregamento dinâmico)
+    reg [31:0] instruction_memory [0:INSTRUCTIONS-1];
+    reg [1023:0] prog_mem_file;
+    
+    initial begin
+        // Permite escolher qual programa executar via linha de comando
+        if (!$value$plusargs("PROG_MEM=%s", prog_mem_file)) begin
+            // Programa padrão caso nenhum seja especificado
+            prog_mem_file = "fibonacci.mem";
+        end
+        
+        $display("Carregando programa: %s", prog_mem_file);
+        
+        // Inicializa a memória com zeros
+        for (integer i = 0; i < INSTRUCTIONS; i = i + 1) begin
+            instruction_memory[i] = 32'h0;
+        end
+        
+        // Carrega o programa da memória
+        $readmemh(prog_mem_file, instruction_memory);
+        
+        // Imprime as primeiras instruções carregadas para verificação
+        $display("Primeiras instruções carregadas:");
+        for (integer i = 0; i < 10; i = i + 1) begin
+            if (instruction_memory[i] != 0)
+                $display("Instrução %0d: 0x%h", i, instruction_memory[i]);
+        end
+    end
+    
+    // Leitura da memória de instruções
+    always @(*) begin
+        IM_data_from_mem = instruction_memory[IM_address_to_mem >> 2];
+    end
+
+    // Memória de Dados
+    reg [31:0] data_memory [0:DATAWORDS-1];
+    
+    initial begin
+        for (integer i = 0; i < DATAWORDS; i = i + 1) begin
+            data_memory[i] = 32'h0;
+        end
+    end
+    
+    // Leitura da memória de dados
+    always @(*) begin
+        DM_data_from_mem = data_memory[DM_address_to_mem >> 2];
+    end
+    
+    // Escrita na memória de dados
+    always @(posedge clk) begin
+    if (DM_write_enable_to_mem) begin
+        // O $display agora mostra a máscara para depuração
+        $display("Ciclo %0t: Escrita na memória - Endereço: 0x%h, Valor: 0x%h, Máscara: %b", 
+                 $time, DM_address_to_mem, DM_data_to_mem);
+        end
+    end
+
+    // Geração de Clock
+    initial clk = 1'b0;
+    always #(CLK_PERIOD/2) clk = ~clk;
+
+    // Lógica de controle e monitoramento
+    reg [31:0] prev_pc;
+    integer stable_pc_counter;
+    
+    initial begin
+        rst = 1'b1; 
+        stable_pc_counter = 0; 
+        prev_pc = 32'hFFFFFFFF;
+        
+        // Aplica reset por alguns ciclos
+        #(2 * CLK_PERIOD);
+        rst = 1'b0;
+        
+        $display("Ciclo %0t: Reset liberado. Iniciando execução.", $time);
+        
+        // Timeout para prevenir loops infinitos
+        #(TIMEOUT_CYCLES * CLK_PERIOD);
+        $display("\n-------------------\nFALHA: Simulação atingiu o TIMEOUT de %0d ciclos.\n-------------------", TIMEOUT_CYCLES);
+        $finish;
+    end
+
+    // Monitoramento do PC para detectar o término (PC estável)
+    always @(posedge clk) begin
+        if (!rst) begin
+            // Verifica se o PC está estável
+            if (pc == prev_pc) 
+                stable_pc_counter = stable_pc_counter + 1;
+            else 
+                stable_pc_counter = 0;
+            
+            prev_pc <= pc;
+
+            // Se o PC permanecer estável por HALT_CYCLES_THR ciclos, termina a simulação
+            if (stable_pc_counter >= HALT_CYCLES_THR) begin
+                $display("\n------------------------------------------------------------");
+                $display("SUCESSO: O PC permaneceu estável em 0x%h por %0d ciclos.", pc, HALT_CYCLES_THR);
+                $display("Simulação encerrada com êxito.");
+                
+                // Mostra os resultados finais nos registradores a0 e a1
+                $display("-> Valor final em a0 (x10): %d (0x%h)", 
+                         dut.dut_datapath.reg_file_unit.registers[10], 
+                         dut.dut_datapath.reg_file_unit.registers[10]);
+                $display("-> Valor final em a1 (x11): %d (0x%h)", 
+                         dut.dut_datapath.reg_file_unit.registers[11], 
+                         dut.dut_datapath.reg_file_unit.registers[11]);
+                $display("------------------------------------------------------------");
+                $finish;
+            end
+        end
+    end
+
+endmodule

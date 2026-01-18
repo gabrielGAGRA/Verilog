@@ -1,0 +1,364 @@
+module ALU
+#(parameter W = 32)
+(
+    input  [3:0]   ALUctl,      
+    input  [W-1:0] A, B,         
+    output [W-1:0] ALUout,       
+    output         Zero          //flag Zero
+);
+    localparam ALU_AND  = 4'b0000, ALU_OR  = 4'b0001, ALU_ADD = 4'b0010, ALU_SUB = 4'b0110, 
+               ALU_SLT  = 4'b0111, ALU_XOR = 4'b0011, ALU_SLL = 4'b0100, ALU_SRL = 4'b0101, 
+               ALU_SRA  = 4'b1000, ALU_SLTU = 4'b1001;
+
+    assign ALUout = (ALUctl == ALU_AND)  ? (A & B) :                     // AND
+                    (ALUctl == ALU_OR)   ? (A | B) :                     // OR
+                    (ALUctl == ALU_ADD)  ? (A + B) :                     // ADD
+                    (ALUctl == ALU_SUB)  ? (A - B) :                     // SUB
+                    (ALUctl == ALU_SLT)  ? (($signed(A) < $signed(B)) ? {{W-1{1'b0}}, 1'b1} : {W{1'b0}}) : // SLT
+                    (ALUctl == ALU_XOR)  ? (A ^ B) :                     // XOR
+                    (ALUctl == ALU_SLL)  ? (A << B[4:0]) :               // SLL 
+                    (ALUctl == ALU_SRL)  ? (A >> B[4:0]) :               // SRL 
+                    (ALUctl == ALU_SRA)  ? ($signed(A) >>> B[4:0]) :     // SRA 
+                    (ALUctl == ALU_SLTU) ? ((A < B) ? {{W-1{1'b0}}, 1'b1} : {W{1'b0}}) : // SLTU 
+                    {W{1'bx}}; 
+
+//define flag Zero
+    assign Zero = (ALUout == {W{1'b0}});
+endmodule
+
+module registerfile
+  #(parameter W = 32)
+(
+  input  wire [4:0] Read1, Read2, WriteReg, 
+  input  wire [W-1:0] WriteData,           
+  input  wire RegWrite,                    
+  input  wire clk,
+  input  wire rst,
+  output wire [W-1:0] Data1, Data2          
+);
+reg [W-1:0] registers [0:31];
+  integer i;
+
+  assign Data1 = (Read1 == 5'b0) ? {W{1'b0}} : registers[Read1];
+  assign Data2 = (Read2 == 5'b0) ? {W{1'b0}} : registers[Read2];
+
+  always @(posedge clk or posedge rst) begin
+    if (rst) begin
+        for (i = 0; i < 32; i = i + 1) begin
+            registers[i] <= {W{1'b0}};
+        end
+    end else begin
+        if (RegWrite && WriteReg != 5'd0) begin
+          registers[WriteReg] <= WriteData;
+        end
+    end
+  end
+endmodule
+
+module ProgramCounter (
+    input wire clk,
+    input wire rst,
+    input wire [5:0] nextPC,
+    output reg [5:0] PC     
+);
+    always @(posedge clk or posedge rst) begin
+        if (rst)
+            PC <= 6'b0;
+        else
+            PC <= nextPC;
+    end
+endmodule
+
+module ImmGen (
+    input wire [31:0] inst,    
+    output reg [31:0] imm      
+);
+    always @(*) begin
+        case(inst[6:0])
+            //tipo i
+            7'b0000011: imm = {{20{inst[31]}}, inst[31:20]};
+// lw, 
+            7'b0010011: imm = {{20{inst[31]}}, inst[31:20]};
+// addi
+            7'b1100111: imm = {{20{inst[31]}}, inst[31:20]};
+// jalr
+
+            //tipo S
+            7'b0100011: imm = {{20{inst[31]}}, inst[31:25], inst[11:7]};
+// sw
+
+            //tipo B
+            7'b1100011: imm = {{19{inst[31]}}, inst[31], inst[7], inst[30:25], inst[11:8], 1'b0};
+//bne, beq
+
+            //tipo J
+            7'b1101111: imm = {{11{inst[31]}}, inst[31], inst[19:12], inst[20], inst[30:21], 1'b0};
+//jal
+
+            //tipo U
+            7'b0110111: imm = {inst[31:12], 12'b0};
+// lui
+            7'b0010111: imm = {inst[31:12], 12'b0};
+// auipc
+
+            default: imm = 32'b0;
+        endcase
+    end
+endmodule
+
+module datapath #(
+    parameter instructions = 1024,
+    parameter datawords = 1024,
+    parameter IFILE_DATAPATH = ""
+)(
+    input wire clk,
+    input wire rst,
+
+    input wire i_RegWrite,
+    input wire i_ALUSrc,            
+    input wire i_MemRead,
+    input wire i_MemWrite,
+    input wire i_Branch,           
+    input wire i_BranchNotZero,  
+    input wire [3:0] i_ALUControl,  
+    input wire [1:0] i_Jump,        
+    input wire i_ALUOp1Select,     
+    input wire [1:0] i_WriteDataSelect, 
+
+    input  wire [31:0] i_IM_data,
+    input  wire [31:0] i_DM_data_i,
+    output wire [$clog2(instructions*4)-1:0] o_IM_address,
+    output wire [$clog2(datawords*4)-1:0] o_DM_address,
+    output wire [31:0] o_DM_data_o,
+    output wire        o_DM_write_enable,
+
+    output wire [31:0] o_ALUResult,
+    output wire o_zero,
+    output wire [6:0] o_opcode,
+   
+    output wire [2:0] o_funct3,
+    output wire o_funct7_bit30,
+    output wire [31:0] o_pc_in,
+    output wire [31:0] o_processed_load_data,
+    output wire [31:0] o_data_write_reg
+);
+    wire [5:0] PC_current_val, PC_next_internal; 
+    wire [31:0] instruction_word;
+    wire [31:0] rf_ReadData1, rf_ReadData2;
+    wire [31:0] immediate_extended;     
+    wire [31:0] alu_operand1, alu_operand2;
+    wire [31:0] alu_result;
+    reg [31:0] processed_load_data; 
+    wire [31:0] data_write_reg;
+    wire [31:0] pc_plus; 
+    wire alu_zero_flag;
+    ProgramCounter pc_unit (
+        .clk(clk), .rst(rst), .nextPC(PC_next_internal), .PC(PC_current_val)
+    );
+    assign o_IM_address = {{24{1'b0}}, PC_current_val, 2'b00}; 
+
+    assign instruction_word = i_IM_data;
+
+    assign alu_operand1 = i_ALUOp1Select ? {{24{1'b0}}, PC_current_val, 2'b00} : rf_ReadData1;
+    assign alu_operand2 = i_ALUSrc ? immediate_extended : rf_ReadData2;
+    
+    ALU #(.W(32)) alu_unit (
+        .ALUctl(i_ALUControl), .A(alu_operand1), .B(alu_operand2),
+        .ALUout(alu_result), .Zero(alu_zero_flag)
+    );
+    always @(*) begin
+        casex({instruction_word[14:12], alu_result[1:0]})
+            // LW
+            5'b010xx: processed_load_data = i_DM_data_i;
+            // LB (signed)
+            5'b00000: processed_load_data = {{24{i_DM_data_i[31]}}, i_DM_data_i[31:24]};
+            5'b00001: processed_load_data = {{24{i_DM_data_i[23]}}, i_DM_data_i[23:16]}; 
+            5'b00010: processed_load_data = {{24{i_DM_data_i[15]}}, i_DM_data_i[15:8]};  
+            5'b00011: processed_load_data = {{24{i_DM_data_i[7]}},  i_DM_data_i[7:0]};
+            // LH (signed)
+            5'b0010x: processed_load_data = {{16{i_DM_data_i[31]}}, i_DM_data_i[31:16]};
+            5'b0011x: processed_load_data = {{16{i_DM_data_i[15]}}, i_DM_data_i[15:0]}; 
+            // LBU (unsigned)
+            5'b10000: processed_load_data = {{24{1'b0}}, i_DM_data_i[31:24]};
+            5'b10001: processed_load_data = {{24{1'b0}}, i_DM_data_i[23:16]};
+            5'b10010: processed_load_data = {{24{1'b0}}, i_DM_data_i[15:8]};
+            5'b10011: processed_load_data = {{24{1'b0}}, i_DM_data_i[7:0]};
+            // LHU (unsigned)
+            5'b1010x: processed_load_data = {{16{1'b0}}, i_DM_data_i[31:16]};
+            5'b1011x: processed_load_data = {{16{1'b0}}, i_DM_data_i[15:0]};
+            default: processed_load_data = i_DM_data_i; 
+        endcase
+    end
+    
+    assign o_processed_load_data = processed_load_data;
+
+    registerfile #(.W(32)) reg_file_unit (
+        .Read1(instruction_word[19:15]), .Read2(instruction_word[24:20]), 
+        .WriteReg(instruction_word[11:7]), .WriteData(data_write_reg), 
+        .RegWrite(i_RegWrite), .clk(clk), .rst(rst),
+        .Data1(rf_ReadData1), .Data2(rf_ReadData2)
+    );
+    ImmGen imm_gen_unit (
+        .inst(instruction_word), .imm(immediate_extended)
+    );
+    assign pc_plus = {{24{1'b0}}, (PC_current_val + 6'd1), 2'b00};
+
+    assign data_write_reg = (i_WriteDataSelect == 2'b01) ? processed_load_data :      
+                                  (i_WriteDataSelect == 2'b10) ? pc_plus :  
+                                  alu_result;
+
+    assign o_DM_address = alu_result;
+    assign o_DM_data_o = rf_ReadData2; 
+    assign o_DM_write_enable = i_MemWrite;
+    
+    wire signed [31:0] signed_imm_byte_offset = $signed(immediate_extended);
+    wire signed [31:0] signed_imm_word_offset = signed_imm_byte_offset >>> 2;
+    wire [5:0] branch_target_pc_word = PC_current_val + signed_imm_word_offset[5:0];
+    wire [5:0] jal_target_pc_word    = PC_current_val + signed_imm_word_offset[5:0];
+    wire [5:0] jalr_target_pc_word   = alu_result[7:2]; 
+    
+    wire condition_branch = (i_BranchNotZero) ? !alu_zero_flag : alu_zero_flag;
+
+    assign PC_next_internal = (i_Jump == 2'b01) ? jal_target_pc_word :   
+                              (i_Jump == 2'b10) ? jalr_target_pc_word :   
+                              (i_Branch && condition_branch) ? branch_target_pc_word : 
+                              (PC_current_val + 6'd1);
+
+    assign o_pc_in = {{24{1'b0}}, PC_next_internal, 2'b00};
+    
+    assign o_ALUResult    = alu_result;
+    assign o_zero         = alu_zero_flag;
+    assign o_opcode       = instruction_word[6:0];
+    assign o_funct3       = instruction_word[14:12];
+    assign o_funct7_bit30 = instruction_word[30];
+    assign o_data_write_reg = data_write_reg;
+endmodule
+
+module control_unit (
+    input wire [6:0] opcode,
+    input wire [2:0] funct3,
+    input wire        funct7_bit30,
+
+    output wire RegWrite,
+    output wire ALUSrc,
+    output wire MemRead,
+    output wire MemWrite,
+    output wire Branch,
+    output wire BranchNotZero,
+    output wire [3:0] ALUControl,
+    output wire [1:0] Jump,           
+    output wire ALUOp1Select,         
+    output wire [1:0] WriteDataSelect 
+);
+
+    localparam ALU_AND = 4'b0000, ALU_OR  = 4'b0001, ALU_ADD = 4'b0010, ALU_XOR = 4'b0011,
+               ALU_SLL = 4'b0100, ALU_SRL = 4'b0101, ALU_SUB = 4'b0110, ALU_SLT = 4'b0111,
+               ALU_SRA = 4'b1000, ALU_SLTU= 4'b1001;
+               
+    wire lui    = opcode==7'b0110111, auipc  = opcode==7'b0010111, jal    = opcode==7'b1101111,
+         jalr   = opcode==7'b1100111, branch = opcode==7'b1100011, load   = opcode==7'b0000011,
+         store  = opcode==7'b0100011, imm    = opcode==7'b0010011, regop  = opcode==7'b0110011;
+    assign RegWrite = lui | auipc | jal | jalr | load | imm | regop;
+    assign ALUSrc = lui | auipc | jalr | load | store | imm;
+    assign MemRead = load;
+    assign MemWrite = store;
+    assign Branch = branch;
+    assign Jump = jal ? 2'b01 : jalr ? 2'b10 : 2'b00;
+    assign ALUOp1Select = auipc;
+    assign WriteDataSelect = load ? 2'b01 : (jal | jalr) ? 2'b10 : 2'b00;
+    assign BranchNotZero = branch & (funct3[2] ? !funct3[0] : funct3[0]);
+
+    assign ALUControl =
+        (load|store|auipc|jalr) ? ALU_ADD : //lw, sw, auipc, jalr
+        lui    ? ALU_ADD  :                 //lui
+        branch ? ((!funct3[2]) ? ALU_SUB : (funct3[1] ? ALU_SLTU : ALU_SLT)) : //beq, bne, blt, bge, bltu, bgeu
+        (imm|regop) ? //tipo I e tipo R
+            (funct3==3'b000 ? (regop & funct7_bit30 ? ALU_SUB : ALU_ADD) : //add, sub, addi
+             funct3==3'b001 ? ALU_SLL :                                   //sll, slli
+             funct3==3'b010 ? ALU_SLT :                                   //slt, slti
+             funct3==3'b011 ? ALU_SLTU:                                   //sltu, sltiu
+             funct3==3'b100 ? ALU_XOR:                                   //xor, xori
+             funct3==3'b101 ? (funct7_bit30?ALU_SRA:ALU_SRL):            //sra, srai, srl, srli
+             funct3==3'b110 ? ALU_OR  :                                   //or, ori
+             funct3==3'b111 ? ALU_AND : ALU_ADD) :                       //and, andi
+        ALU_ADD;
+endmodule
+
+module poliriscv_sc32 #(
+    parameter instructions = 1024, 
+    parameter datawords = 1024
+) (
+    input clk, rst,
+    input [31:0] IM_data, 
+    input [31:0] DM_data_i,
+    output [$clog2(instructions*4)-1:0] IM_address, 
+    output [$clog2(datawords*4)-1:0]  DM_address,
+    output [31:0] DM_data_o,
+    output DM_write_enable,
+
+    output [31:0] pc,
+    output [31:0] pc_in,
+    output [31:0] ALUout,
+    output [31:0] rfi_wd,
+    output [4:0]  rfi_rd
+);
+    wire i_RegWrite;
+    wire i_ALUSrc;
+    wire i_MemRead;
+    wire i_MemWrite;
+    wire i_Branch;
+    wire i_BranchNotZero;
+    wire [3:0] i_ALUControl;
+    wire [1:0] i_Jump;
+    wire i_ALUOp1Select;
+    wire [1:0] i_WriteDataSelect;
+
+    wire o_zero_from_dp;
+    wire [6:0] o_opcode_from_dp;
+    wire [2:0] o_funct3_from_dp;
+    wire o_funct7_bit30_from_dp;
+    
+    wire [31:0] o_processed_load_data_from_dp;
+
+    wire [31:0] instruction_word;
+    wire [31:0] o_data_write_reg_from_dp;
+
+    assign instruction_word = IM_data;
+    datapath #(
+        .instructions(instructions),
+        .datawords(datawords),
+        .IFILE_DATAPATH("ignorado") 
+    ) dut_datapath (
+        .clk(clk), .rst(rst),
+        .i_IM_data(IM_data), 
+        .i_DM_data_i(DM_data_i),
+        .o_IM_address(IM_address),
+        .o_DM_address(DM_address),
+        .o_DM_data_o(DM_data_o),
+        .o_DM_write_enable(DM_write_enable),
+        .i_RegWrite(i_RegWrite), .i_ALUSrc(i_ALUSrc),
+        .i_MemRead(i_MemRead), .i_MemWrite(i_MemWrite), .i_Branch(i_Branch),
+       
+        .i_BranchNotZero(i_BranchNotZero), .i_ALUControl(i_ALUControl),
+        .i_Jump(i_Jump), .i_ALUOp1Select(i_ALUOp1Select), .i_WriteDataSelect(i_WriteDataSelect),
+        .o_ALUResult(ALUout),
+        .o_zero(o_zero_from_dp),
+        .o_opcode(o_opcode_from_dp), .o_funct3(o_funct3_from_dp),
+        .o_funct7_bit30(o_funct7_bit30_from_dp),
+        .o_pc_in(pc_in),
+        .o_processed_load_data(o_processed_load_data_from_dp),
+        .o_data_write_reg(o_data_write_reg_from_dp)
+    );
+    control_unit dut_control_unit (
+        .opcode(o_opcode_from_dp), .funct3(o_funct3_from_dp), .funct7_bit30(o_funct7_bit30_from_dp),
+        .RegWrite(i_RegWrite), .ALUSrc(i_ALUSrc),
+        .MemRead(i_MemRead), .MemWrite(i_MemWrite), .Branch(i_Branch),
+        .BranchNotZero(i_BranchNotZero), .ALUControl(i_ALUControl),
+        .Jump(i_Jump), .ALUOp1Select(i_ALUOp1Select), .WriteDataSelect(i_WriteDataSelect)
+    );
+    assign pc = IM_address;
+    
+    assign rfi_wd = o_data_write_reg_from_dp;
+    assign rfi_rd = IM_data[11:7];
+
+endmodule

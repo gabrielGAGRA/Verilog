@@ -1,0 +1,19 @@
+Entregas:
+ULA
+Testbench da ULA
+RF (registradores)
+Testbench do URF
+
+Cabecalho:
+NUSP + Nome
+
+ULA:
+Parametrizada
+Flags
+ALU(t)
+
+RF:
+Clock
+Parametrizada
+32x
+Rzero
