@@ -3,6 +3,7 @@ module circuito_exp4(
     input reset,
     input iniciar,
     input [3:0] chaves,
+    input modo,
     output acertou,
     output errou,
     output pronto,
@@ -22,10 +23,13 @@ module circuito_exp4(
     output db_timeout,
     output db_tem_jogada,
     output db_enable_timeout,
-    output db_zera_s_timeout
+    output db_zera_s_timeout,
+    output db_modo,
+    output chaveada
 );
 
 wire zeraC, zeraR, registraR, contaC, fimC, igual, tem_jogada, jogada_feita, timeout, enable_timeout, zera_s_timeout;
+wire registra_modo, fim_4_jogadas, s_modo;
 wire [6:0] hexa0, hexa1, hexa2, hexa3;
 wire [3:0] s_contagem, s_memoria, s_estado, s_jogada;
 
@@ -33,12 +37,15 @@ exp4_fluxo_dados fluxo_dados(
     .clock(clock),
     .reset(reset),
     .chaves(chaves),
+    .modo(modo),
     .zeraR(zeraR),
     .registrarR(registraR),
     .contaC(contaC),
     .zeraC(zeraC),
+    .registra_modo(registra_modo),
     .igual(igual),
     .fimC(fimC),
+    .fim_4_jogadas(fim_4_jogadas),
     .db_contagem(s_contagem),
     .db_jogada(s_jogada),
     .db_memoria(s_memoria),
@@ -46,7 +53,9 @@ exp4_fluxo_dados fluxo_dados(
     .db_tem_jogada(tem_jogada),
     .db_enable_timeout(enable_timeout),
     .timeout(timeout),
-    .zera_s_timeout(zera_s_timeout)
+    .zera_s_timeout(zera_s_timeout),
+    .db_modo(s_modo),
+    .chaveada(chaveada)
 );
 
 exp4_unidade_controle unidade_controle(
@@ -54,13 +63,15 @@ exp4_unidade_controle unidade_controle(
     .reset(reset),
     .iniciar(iniciar),
     .fim(fimC),
+    .fim_4_jogadas(fim_4_jogadas),
+    .modo(s_modo),
     .jogada(jogada_feita),
     .igual(igual),
-    .timeout(timeout),
     .zerac(zeraC),
     .contac(contaC),
     .zeraR(zeraR),
     .registrarR(registraR),
+    .registra_modo(registra_modo),
     .pronto(pronto),
     .db_estado(s_estado),
     .errou(errou),
@@ -105,5 +116,7 @@ assign db_clock = clock;
 assign leds = s_memoria;
 assign db_enable_timeout = enable_timeout;
 assign db_timeout = timeout;
+assign db_zera_s_timeout = zera_s_timeout;
+assign db_modo = s_modo;
 
 endmodule

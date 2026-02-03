@@ -5,23 +5,29 @@ module exp4_fluxo_dados (
     input        zeraR,
     input reset,
     input        registrarR,
+    input zera_s_timeout,
     input  [3:0] chaves,
+    input modo,
+    input registra_modo,
     output       igual,
     output       fimC,
-    output       jogada_feita,      // Pulso do edge_detector
-    output       db_tem_jogada,     // Saída da porta OR
+    output       jogada_feita,      // pulso do edge_detector
+    output       db_tem_jogada,     // saída da porta OR
     output db_enable_timeout,
     output [3:0] db_contagem,
     output [3:0] db_memoria,
     output timeout,
     output [3:0] db_jogada,
-    output db_zera_s_timeout
+    output db_modo,
+    output fim_4_jogadas,
+    output chaveada
 );
     wire [3:0] s_endereco;
     wire [3:0] s_dado, s_chaves;
     wire       s_tem_jogada;
     wire enable_timeout;
-    wire zera_s_timeout;
+    reg s_modo;
+    reg s_chaveada;
 
     // porta OR para detectar se qualquer chave foi pressionada
     assign s_tem_jogada = |chaves; 
@@ -29,6 +35,21 @@ module exp4_fluxo_dados (
     // enable timeout quando nao tem jogada
     assign enable_timeout = ~s_tem_jogada;
     assign db_enable_timeout = enable_timeout;
+
+    // captura modo quando registra_modo = 1
+    always @(posedge clock or posedge reset) begin
+        if (reset)
+            s_modo <= 1'b0;
+        else if (registra_modo)
+            s_modo <= modo;
+    end
+
+    always @(posedge clock or posedge reset) begin
+        if (reset)
+            s_chaveada <= 1'b0;
+        else if (registra_modo)  // ativa quando registra modo (início do jogo)
+            s_chaveada <= 1'b1;
+    end
 
     // detector de borda para gerar pulso de 1 clock
     edge_detector detector (
@@ -86,6 +107,9 @@ module exp4_fluxo_dados (
     assign db_contagem = s_endereco;
     assign db_jogada   = s_chaves;
     assign db_memoria  = s_dado;
-    assign db_zera_s_timeout = zera_s_timeout;
+    assign db_zera_s_timeout = zera_s_timeout;  // debug
+    assign db_modo = s_modo;
+    assign fim_4_jogadas = (s_endereco == 4'b0011);  // fim após 4 jogadas (contagem 0-3)
+    assign chaveada = s_chaveada;
 
 endmodule

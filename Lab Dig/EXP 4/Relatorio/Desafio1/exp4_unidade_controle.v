@@ -3,6 +3,8 @@ module exp4_unidade_controle (
     input      reset,
     input      iniciar,
     input      fim,
+    input      fim_4_jogadas,
+    input      modo,
     input      jogada,    // Vem do pulso jogada_feita do FD
     input      igual,
     input timeout,
@@ -10,6 +12,7 @@ module exp4_unidade_controle (
     output reg contac,
     output reg zeraR,
     output reg registrarR,
+    output reg registra_modo,
     output reg acertou,
     output reg errou,
     output reg pronto,
@@ -22,6 +25,7 @@ module exp4_unidade_controle (
 
     // Definição dos estados
     parameter inicial      = 4'b0000; // inicial = 0
+    parameter aguarda_modo = 4'b1000; // aguarda_modo = 8
     parameter preparacao   = 4'b0001; // preparacao = 1
     parameter espera       = 4'b0010; // espera =  2
     parameter registra     = 4'b0011; // registra = 3
@@ -38,17 +42,19 @@ module exp4_unidade_controle (
 
     always @* begin
         case (Eatual)
-            inicial:    Eprox = iniciar ? preparacao : inicial;
+            inicial:    Eprox = iniciar ? aguarda_modo : inicial;
+            aguarda_modo: Eprox = preparacao;
             preparacao: Eprox = espera;
             espera:     if (timeout) Eprox = final_timeout; // vai pro timeout
                         else Eprox = jogada ? registra : espera; 
             registra:   Eprox = comparacao;
             comparacao: if (!igual) Eprox = final_erro;
-                        else Eprox = fim ? final_acerto : proximo;
+                        else if (modo == 1'b0) Eprox = fim ? final_acerto : proximo;  // modo=0: 16 jogadas
+                        else Eprox = fim_4_jogadas ? final_acerto : proximo;  // modo=1: 4 jogadas
             proximo:    Eprox = espera;
-            final_acerto: Eprox = iniciar ? preparacao : final_acerto;
-            final_erro:   Eprox = iniciar ? preparacao : final_erro;
-            final_timeout: Eprox = iniciar ? preparacao : final_timeout;
+            final_acerto: Eprox = iniciar ? aguarda_modo : final_acerto;
+            final_erro:   Eprox = iniciar ? aguarda_modo : final_erro;
+            final_timeout: Eprox = iniciar ? aguarda_modo : final_timeout;
             default:    Eprox = inicial;
         endcase
     end
@@ -59,9 +65,10 @@ module exp4_unidade_controle (
         zeraR      = (Eatual == preparacao);
         registrarR = (Eatual == registra);
         contac     = (Eatual == proximo);
+        registra_modo = (Eatual == aguarda_modo);
 
         //sinal zera s para  preparacao e a cada jogada
-        zera_s_timeout == (Eatual = preparacao || Eatual == proximo);
+        zera_s_timeout = (Eatual == preparacao || Eatual == proximo);
         
         // sinais de status
         acertou    = (Eatual == final_acerto);
