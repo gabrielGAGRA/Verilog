@@ -60,9 +60,9 @@ module jogo_desafio_memoria_tb;
     );
 
     // =========================================================================
-    // Geração de Clock (50 MHz -> Período de 20ns)
+    // Geração de Clock (1 MHz -> Período de 1000ns)
     // =========================================================================
-    always #10 clock = ~clock;
+    always #500 clock = ~clock;
 
     // =========================================================================
     // Tarefas Auxiliares para Simulação
