@@ -1,15 +1,16 @@
-module circuito_jogo_sequencias(
-    input        clock,
-    input        reset,
-    input        jogar,     // jogar (iniciar)
-    input        modo,
-    input  [3:0] botoes,
+module jogo_desafio_memoria(
+     input clock,
+    input reset,
+    input jogar,
+    input [1:0] configuracao,
+    input [3:0] botoes,
     input        conf_leds,
+    output [2:0] leds_rgb,
+    output ganhou,
+    output perdeu,
+    output pronto,
+    output timeout
     output [3:0] leds,
-    output       pronto,
-    output       ganhou,    // output ganhou
-    output       perdeu,    // output perdeu
-    output       timeout,
     //db
     output       db_igual,
     output [6:0] db_contagem,
@@ -21,49 +22,51 @@ module circuito_jogo_sequencias(
     output       db_enderecoIgualLimite,
     output       db_timeout,
     output       db_modo,
-    output [6:0] db_limite_view, // ver a rodada nos displays
-    output [2:0] rgb
+    output [6:0] db_limite_rodada, // ver a rodada nos displays
 );
 
     wire zera_endereco, conta_endereco, zera_limite, conta_limite;
     wire zeraR, registraR, igual, tem_jogada, jogada_feita, enable_timeout, zera_s_timeout, s_pulso_timeout;
     wire registra_modo, zera_modo, s_modo;
     wire enderecoIgualLimite, fim_jogo;
+    wire timout_led, fim_sequencia, conf_leds, registra_jogada, zera_s_led, enable_led;
     wire [6:0] hexa0, hexa1, hexa2, hexa3, hexa5;
     wire [3:0] s_contagem, s_memoria, s_estado, s_jogada, s_limite;
 	 
-    // wire [2:0] s_rgb;
-
     fluxo_dados fluxo_dados(
         .clock(clock),
-        .reset(reset),
-        .botoes(botoes),
-        .modo(modo),
-        .zeraR(zeraR),
-        .registrarR(registraR),
         .zera_endereco(zera_endereco),
         .conta_endereco(conta_endereco),
         .zera_limite(zera_limite),
         .conta_limite(conta_limite),
+        .zeraR(zeraR),
+        .reset(reset),
+        .registrarR(registraR),
+        .zera_s_timeout(zera_s_timeout),
+        .enable_timeout(enable_timeout),
+        .botoes(botoes),
+        .modo(modo),
         .registra_modo(registra_modo),
         .zera_modo(zera_modo),
-        .enable_timeout(enable_timeout),
-        .zera_s_timeout(zera_s_timeout),
+        .conf_leds(conf_leds),
+        .registra_jogada(registra_jogada),
+        .zera_s_led(zera_s_led),
+        .enable_led(enable_led),
         .igual(igual),
-        .enderecoIgualLimite(enderecoIgualLimite),
         .fim_jogo(fim_jogo),
-        .db_contagem(s_contagem),
-        .db_jogada(s_jogada),
-        .db_memoria(s_memoria),
-        .db_limite(s_limite),
+        .enderecoIgualLimite(enderecoIgualLimite),
         .jogada_feita(jogada_feita),
         .db_tem_jogada(tem_jogada),
         .db_enable_timeout(),
+        .db_contagem(s_contagem),
+        .db_memoria(s_memoria),
+        .db_limite(s_limite),
         .timeout(s_pulso_timeout),
+        .db_jogada(s_jogada),
         .db_modo(s_modo),
-        .conf_leds(conf_leds),
-        .leds(leds),
-        .rgb(rgb)
+        .leds_rgb(leds_rgb),
+        .timeout_led(timeout_led),
+        .fim_sequencia(fim_sequencia)
     );
 
     unidade_controle unidade_controle(
@@ -74,6 +77,9 @@ module circuito_jogo_sequencias(
         .enderecoIgualLimite(enderecoIgualLimite),
         .jogada(jogada_feita),
         .igual(igual),
+        .timeout(s_pulso_timeout),
+        .timeout_led(timeout_led),
+        .fim_sequencia(fim_sequencia),
         .zera_endereco(zera_endereco),
         .conta_endereco(conta_endereco),
         .zera_limite(zera_limite),
@@ -82,17 +88,18 @@ module circuito_jogo_sequencias(
         .registrarR(registraR),
         .registra_modo(registra_modo),
         .zera_modo(zera_modo),
+        .acertou(ganhou),              
+        .errou(perdeu),                
         .pronto(pronto),
         .db_estado(s_estado),
-        .errou(perdeu),                
-        .acertou(ganhou),              
-        .zera_s_timeout(zera_s_timeout),
-        .timeout(s_pulso_timeout),
         .db_timeout(timeout),
-        .enable_timeout(enable_timeout)
+        .zera_s_timeout(zera_s_timeout),
+        .enable_timeout(enable_timeout),
+        .conf_leds(conf_leds),
+        .registra_jogada(registra_jogada),
+        .zera_s_led(zera_s_led),
+        .enable_led(enable_led)
     );
-
-    // corzinha converter_cor ( ... ); // Movido para fluxo_dados
 
     hexa7seg HEX0 ( .hexa(s_contagem), .display(hexa0) );
     hexa7seg HEX1 ( .hexa(s_memoria),  .display(hexa1) );
@@ -104,14 +111,12 @@ module circuito_jogo_sequencias(
     assign db_contagem = hexa0; 
     assign db_memoria = hexa1;
     assign db_jogadafeita = hexa2;
-    assign db_limite_view = hexa3;
+    assign db_limite_rodada = hexa3;
     assign db_estado = hexa5;
     assign db_enderecoIgualLimite = enderecoIgualLimite; 
     assign db_igual = igual;
     assign db_clock = clock;
     assign db_modo = s_modo;
     assign db_timeout = timeout;
-
-    // Leds e RGB gerados no fluxo de dados
 
 endmodule

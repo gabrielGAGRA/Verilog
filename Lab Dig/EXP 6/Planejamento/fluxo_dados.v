@@ -14,9 +14,12 @@ module fluxo_dados (
     input        registra_modo,
     input        zera_modo,
     input        conf_leds,
+    input        registra_jogada,
+    input        zera_s_led,
+    input        enable_led,
     output       igual,
-    output       fim_jogo,         // Fim total (ganhou)
-    output       enderecoIgualLimite, // Fim da rodada atual
+    output       fim_jogo,         
+    output       enderecoIgualLimite, 
     output       jogada_feita,
     output       db_tem_jogada,
     output       db_enable_timeout,
@@ -26,9 +29,9 @@ module fluxo_dados (
     output       timeout,
     output [3:0] db_jogada,
     output       db_modo,
-    output       chavesIgualMemoria,
-    output [3:0] leds,
-    output [2:0] rgb
+    output [2:0] rgb,
+    output       timeout_led,
+    output       fim_sequencia
 );
     wire [3:0] s_endereco;
     wire [3:0] s_dado, s_botoes; 
@@ -42,7 +45,6 @@ module fluxo_dados (
     assign db_tem_jogada = s_tem_jogada;
     assign db_enable_timeout = enable_timeout;
 
-    // Registrador de modo
     registrador_1 reg_modo (
         .clock(clock),
         .clear(zera_modo),
@@ -78,7 +80,7 @@ module fluxo_dados (
     );
 
     contador_m #(
-        .M(3000),
+        .M(5000),
         .N(13)
     ) contador_timeout (
         .clock(clock),
@@ -129,10 +131,13 @@ module fluxo_dados (
         .Q(s_botoes)
     );
 
-    sync_rom_16x4 memoria (
-        .clock(clock),
-        .address(s_endereco),
-        .data_out(s_dado)
+
+    sync_ram_16x4_file memoria(
+        .clk(clock),
+         .we(registra_jogada),
+         .data(botoes),
+         .addr(s_endereco),
+         .q(s_dado)
     );
 
     corzinha converter_cor (
@@ -140,14 +145,6 @@ module fluxo_dados (
         .rgb(s_rgb)
     );
 
-    mux2x1_n #(
-        .N(4)
-    ) mux_leds (
-        .D0(s_dado),
-        .D1(4'b0000),
-        .S(conf_leds),
-        .Y(leds)
-    );
 
     mux2x1_n #(
         .N(3)
@@ -158,11 +155,24 @@ module fluxo_dados (
         .Y(rgb)
     );
 
+    contador_m #(
+        .M(2000),
+        .N(11)
+    ) contador_led (
+        .clock(clock),
+        .zera_as(reset), 
+        .zera_s(zera_s_led),
+        .conta(enable_led),
+        .Q(),
+        .fim(timeout_led),
+        .meio()
+    );
+
     assign db_contagem = s_endereco;
     assign db_jogada   = s_botoes;
     assign db_memoria  = s_dado;
     assign db_limite   = s_limite;
     assign db_modo     = s_modo;
-    assign chavesIgualMemoria = igual;
+    assign fim_sequencia = enderecoIgualLimite; 
 
 endmodule
