@@ -96,10 +96,53 @@ module jogo_desafio_memoria_tb;
         end
     endtask
 
+    reg [3:0] sequencia_correta [0:15];
+    integer k_rodada;
+
+    // Tarefa para jogar uma rodada completa com sucesso
+    task play_round_success;
+        input integer n_rodada;
+        input integer ultima_rodada; 
+        integer j;
+        begin
+            $display("[%0t] --- Rodada %0d ---", $time, n_rodada+1);
+            wait_leds(n_rodada + 1);
+            for (j = 0; j <= n_rodada; j = j + 1) begin
+                press_button(sequencia_correta[j]);
+            end
+            if (!ultima_rodada) begin
+                wait(dut.unidade_controle.Eatual == 4'b1101 || dut.perdeu);
+                if (dut.perdeu) begin
+                    $display("ERRO: Perdeu inesperadamente na rodada %0d", n_rodada+1);
+                    $stop;
+                end
+                press_button(sequencia_correta[n_rodada+1]);
+            end
+        end
+    endtask
+
     // =========================================================================
     // Bloco Principal de Teste
     // =========================================================================
     initial begin
+        // Inicializa sequencia correta
+        sequencia_correta[0]  = 4'b0001; // RAM init
+        sequencia_correta[1]  = 4'b0010;
+        sequencia_correta[2]  = 4'b0100;
+        sequencia_correta[3]  = 4'b1000;
+        sequencia_correta[4]  = 4'b0001;
+        sequencia_correta[5]  = 4'b0010;
+        sequencia_correta[6]  = 4'b0100;
+        sequencia_correta[7]  = 4'b1000;
+        sequencia_correta[8]  = 4'b0001;
+        sequencia_correta[9]  = 4'b0010;
+        sequencia_correta[10] = 4'b0100;
+        sequencia_correta[11] = 4'b1000;
+        sequencia_correta[12] = 4'b0001;
+        sequencia_correta[13] = 4'b0010;
+        sequencia_correta[14] = 4'b0100;
+        sequencia_correta[15] = 4'b1000;
+
         // Configuração inicial para o ModelSim
         $display("==================================================");
         $display("Iniciando Testbench: Jogo Desafio Memoria");
@@ -122,73 +165,13 @@ module jogo_desafio_memoria_tb;
         // TESTE 1: Jogo Completo (Modo Demonstração - 4 rodadas) sem timeout
         // ---------------------------------------------------------------------
         $display("\n[%0t] ---> INICIANDO TESTE 1: Vitoria no Modo Demonstracao", $time);
-        // configuracao[0] = 1 (modo demonstração: 4 rodadas)
-        // configuracao[1] = 0 (timeout desabilitado)
         configuracao = 2'b01; 
-        
-        // Pulso no botão jogar
-        jogar = 1;
-        #40 jogar = 0;
+        jogar = 1; #40 jogar = 0;
 
-        // Rodada 1 (Limite = 0) - Deve jogar 0001
-        $display("[%0t] Rodada 1: Aguardando LEDs...", $time);
-        wait_leds(1);
-        $display("[%0t] Rodada 1: Inserindo jogada (0001)...", $time);
-        press_button(4'b0001); // Acerta a cor inicial da RAM
-        
-        // Aguarda estado de adicionar nova cor (adiciona_jogada = 4'b1101)
-        wait(dut.unidade_controle.Eatual == 4'b1101 || dut.perdeu); 
-        if (dut.perdeu) begin
-            $display("ERRO: O jogo entrou no estado de derrota inesperadamente na Rodada 1!");
-            $stop;
+        for (k_rodada = 0; k_rodada < 4; k_rodada = k_rodada + 1) begin
+            play_round_success(k_rodada, (k_rodada == 3));
         end
 
-        $display("[%0t] Rodada 1: Adicionando nova cor (0010)...", $time);
-        press_button(4'b0010); // Adiciona azul
-
-        // Rodada 2 (Limite = 1) - Deve jogar 0001, 0010
-        $display("[%0t] Rodada 2: Aguardando LEDs...", $time);
-        wait_leds(2);
-        $display("[%0t] Rodada 2: Inserindo jogadas (0001, 0010)...", $time);
-        press_button(4'b0001);
-        press_button(4'b0010);
-        
-        wait(dut.unidade_controle.Eatual == 4'b1101 || dut.perdeu);
-        if (dut.perdeu) begin
-            $display("ERRO: O jogo entrou no estado de derrota inesperadamente na Rodada 2!");
-            $stop;
-        end
-
-        $display("[%0t] Rodada 2: Adicionando nova cor (0100)...", $time);
-        press_button(4'b0100); // Adiciona amarelo
-
-        // Rodada 3 (Limite = 2) - Deve jogar 0001, 0010, 0100
-        $display("[%0t] Rodada 3: Aguardando LEDs...", $time);
-        wait_leds(3);
-        $display("[%0t] Rodada 3: Inserindo jogadas (0001, 0010, 0100)...", $time);
-        press_button(4'b0001);
-        press_button(4'b0010);
-        press_button(4'b0100);
-        
-        wait(dut.unidade_controle.Eatual == 4'b1101 || dut.perdeu);
-        if (dut.perdeu) begin
-            $display("ERRO: O jogo entrou no estado de derrota inesperadamente na Rodada 3!");
-            $stop;
-        end
-
-        $display("[%0t] Rodada 3: Adicionando nova cor (1000)...", $time);
-        press_button(4'b1000); // Adiciona verde
-
-        // Rodada 4 (Limite = 3) - Última rodada - Deve jogar 0001, 0010, 0100, 1000
-        $display("[%0t] Rodada 4: Aguardando LEDs...", $time);
-        wait_leds(4);
-        $display("[%0t] Rodada 4: Inserindo jogadas finais (0001, 0010, 0100, 1000)...", $time);
-        press_button(4'b0001);
-        press_button(4'b0010);
-        press_button(4'b0100);
-        press_button(4'b1000);
-
-        // Aguarda estado de vitória (final_acerto = 4'b1011)
         wait(ganhou == 1 || perdeu == 1);
         if (perdeu) begin
             $display("ERRO: O jogo perdeu na ultima rodada!");
@@ -201,18 +184,14 @@ module jogo_desafio_memoria_tb;
         // TESTE 2: Erro do jogador
         // ---------------------------------------------------------------------
         $display("\n[%0t] ---> INICIANDO TESTE 2: Erro do jogador", $time);
-        
-        // Inicia um novo jogo
-        jogar = 1;
-        #40 jogar = 0;
+        reset = 1; #40 reset = 0; #40;
+        jogar = 1; #40 jogar = 0;
 
-        // Rodada 1
         $display("[%0t] Rodada 1: Aguardando LEDs...", $time);
         wait_leds(1);
         $display("[%0t] Rodada 1: Inserindo jogada ERRADA (1000)...", $time);
-        press_button(4'b1000); // Erra de propósito (esperado era 0001)
+        press_button(4'b1000); // Erra de propósito
 
-        // Aguarda estado de erro (final_erro = 4'b1100)
         wait(perdeu == 1);
         $display("[%0t] TESTE 2 CONCLUIDO: Erro detectado corretamente!", $time);
         #1000;
@@ -221,22 +200,91 @@ module jogo_desafio_memoria_tb;
         // TESTE 3: Timeout
         // ---------------------------------------------------------------------
         $display("\n[%0t] ---> INICIANDO TESTE 3: Timeout", $time);
-        // configuracao[0] = 1 (modo demonstração)
-        // configuracao[1] = 1 (timeout habilitado)
-        configuracao = 2'b11; 
-        
-        // Inicia um novo jogo
-        jogar = 1;
-        #40 jogar = 0;
+        reset = 1; #40 reset = 0; #40;
 
-        // Rodada 1
+        configuracao = 2'b11; // Modo demo, timeout hab
+        jogar = 1; #40 jogar = 0;
+
         $display("[%0t] Rodada 1: Aguardando LEDs...", $time);
         wait_leds(1);
         
         $display("[%0t] Rodada 1: Aguardando estourar o tempo (timeout)...", $time);
-        // Não pressiona nenhum botão e aguarda o sinal de timeout
-        wait(dut.timeout == 1);
+        wait(dut.timeout == 1 || dut.unidade_controle.Eatual == 4'b1111);
         $display("[%0t] TESTE 3 CONCLUIDO: Timeout detectado corretamente!", $time);
+        #1000;
+
+        // ---------------------------------------------------------------------
+        // TESTE 4: Vitoria no Modo Completo (16 rodadas)
+        // ---------------------------------------------------------------------
+        $display("\n[%0t] ---> INICIANDO TESTE 4: Vitoria no Modo Completo (16 rodadas)", $time);
+        reset = 1; #40 reset = 0; #40;
+        configuracao = 2'b00; // Modo completo, timeout desab
+        jogar = 1; #40 jogar = 0;
+
+        for (k_rodada = 0; k_rodada < 16; k_rodada = k_rodada + 1) begin
+            play_round_success(k_rodada, (k_rodada == 15));
+        end
+
+        wait(ganhou == 1);
+        $display("[%0t] TESTE 4 CONCLUIDO: Vitoria em 16 rodadas detectada!", $time);
+        #1000;
+
+        // ---------------------------------------------------------------------
+        // TESTE 5: Derrota no Modo Completo (16 rodadas)
+        // ---------------------------------------------------------------------
+        $display("\n[%0t] ---> INICIANDO TESTE 5: Derrota no Modo Completo (Rodada 8)", $time);
+        reset = 1; #40 reset = 0; #40;
+        jogar = 1; #40 jogar = 0;
+
+        // Joga 7 rodadas com sucesso
+        for (k_rodada = 0; k_rodada < 7; k_rodada = k_rodada + 1) begin
+            play_round_success(k_rodada, 0);
+        end
+
+        // Na rodada 8, erra de propósito
+        $display("[%0t] --- Rodada 8 (Tentativa de Erro) ---", $time);
+        wait_leds(8);
+        press_button(sequencia_correta[0]);
+        press_button(sequencia_correta[1]);
+        $display("   Inserindo ERRO proposital...");
+        press_button(~sequencia_correta[2]); // Inverte os bits para errar
+
+        wait(perdeu == 1);
+        $display("[%0t] TESTE 5 CONCLUIDO: Derrota detectada corretamente!", $time);
+        #1000;
+
+        // ---------------------------------------------------------------------
+        // TESTE 6: Reiniciar Jogo (Verifica limpeza de contadores)
+        // ---------------------------------------------------------------------
+        $display("\n[%0t] ---> INICIANDO TESTE 6: Reinicio Apos Derrota (Verifica Limpeza)", $time);
+        // Nao damos reset aqui de proposito, apenas apertamos jogar para ver se limpa
+        jogar = 1; #40 jogar = 0;
+
+        $display("[%0t] Rodada 1 apos reinicio...", $time);
+        play_round_success(0, 0); // Joga a primeira rodada com sucesso
+
+        $display("[%0t] TESTE 6 CONCLUIDO: Sistema reiniciado e contadores limpos corretamente.", $time);
+        #1000;
+
+        // ---------------------------------------------------------------------
+        // TESTE 7: Esperar com Timeout Desligado
+        // ---------------------------------------------------------------------
+        $display("\n[%0t] ---> INICIANDO TESTE 7: Esperar com Timeout Desligado", $time);
+        reset = 1; #40 reset = 0; #40;
+        configuracao = 2'b00; // Timeout desabilitado
+        jogar = 1; #40 jogar = 0;
+
+        $display("[%0t] Rodada 1: Aguardando LEDs...", $time);
+        wait_leds(1);
+
+        $display("[%0t] Rodada 1: Aguardando um longo tempo (simulando inatividade)...", $time);
+        #500000; // Espera um tempo longo (maior que o timeout normal)
+
+        $display("[%0t] Rodada 1: Inserindo jogada apos longa espera...", $time);
+        press_button(sequencia_correta[0]);
+        
+        wait(dut.unidade_controle.Eatual == 4'b1101);
+        $display("[%0t] TESTE 7 CONCLUIDO: Jogo continuou normalmente apos longa espera!", $time);
         #1000;
 
         // Fim da simulação

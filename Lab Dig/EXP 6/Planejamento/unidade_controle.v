@@ -162,7 +162,9 @@ module unidade_controle (
         // timeout residual acumulado de rodadas anteriores.
         zera_s_timeout = (Eatual == preparacao || Eatual == proximo
                           || Eatual == proxima_rodada || Eatual == inicial);
-        enable_timeout = (Eatual == espera);
+        
+        // TODO: Timeout também está valendo para escolher a nova cor. Não sei se era o intencionado. Verificar.
+        enable_timeout = (Eatual == espera || Eatual == adiciona_jogada);
 
         acertou = (Eatual == final_acerto);
         errou   = (Eatual == final_erro);

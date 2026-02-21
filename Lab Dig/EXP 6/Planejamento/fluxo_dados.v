@@ -42,6 +42,7 @@ module fluxo_dados (
 
     // -- Saída RGB para os LEDs da placa --------------------------------------
     output [2:0] rgb,
+    output [3:0] leds,
 
     // -- Depuração ------------------------------------------------------------
     output       db_tem_jogada,
@@ -176,7 +177,18 @@ module fluxo_dados (
         .leds_rgb(s_rgb)
     );
 
-    mux2x1_n #( .BITS(3) ) mux_rgb (
+    mux2x1_n #(
+        .BITS(4)
+    ) mux_leds (
+        .D0(s_dado),
+        .D1(4'b0000),
+        .SEL(conf_leds),
+        .OUT(leds)
+    );
+
+    mux2x1_n #(
+        .BITS(3)
+    ) mux_rgb (
         .D0(3'b000),
         .D1(s_rgb),
         .SEL(conf_leds),

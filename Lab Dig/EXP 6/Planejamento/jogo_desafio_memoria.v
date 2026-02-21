@@ -92,6 +92,7 @@ module jogo_desafio_memoria (
         .db_jogada(s_jogada),
         .db_modo(s_modo),
         .rgb(leds_rgb),
+        .leds(leds),
         .timeout_habilitado(s_timeout_habilitado),
         .timeout_led(timeout_led),
         .fim_sequencia(fim_sequencia)
