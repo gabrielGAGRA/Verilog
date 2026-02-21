@@ -1,77 +1,112 @@
+// ---------------------------------------------------------------------------
+// Módulo: fluxo_dados
+// ---------------------------------------------------------------------------
+// Caminho dos dados do jogo. Interliga memória, contadores,
+// comparadores, temporizadores e registradores sob comando da
+// unidade de controle.
+// ---------------------------------------------------------------------------
 module fluxo_dados (
+    // -- Sinais globais -------------------------------------------------------
     input        clock,
+    input        reset,
+
+    // -- Comandos vindos da unidade de controle -------------------------------
     input        zera_endereco,
     input        conta_endereco,
-    input        zera_limite,      
-    input        conta_limite,     
+    input        zera_limite,
+    input        conta_limite,
     input        zeraR,
-    input        reset,
     input        registrarR,
     input        zera_s_timeout,
     input        enable_timeout,
-    input  [3:0] botoes,           
-    input        modo,
     input        registra_modo,
     input        zera_modo,
-    input        conf_leds,
-    input        registra_jogada,
+    input        conf_leds,        // 1 = exibe cor no RGB; 0 = LED apagado
+    input        registra_jogada,  // habilita a escrita na RAM
     input        zera_s_led,
     input        enable_led,
+
+    // -- Entradas do jogador --------------------------------------------------
+    input  [3:0] botoes,
+    input  [1:0] configuracao,     // [0] modo, [1] timeout habilitado
+
+    // -- Flags de status para a unidade de controle ---------------------------
     output       igual,
-    output       fim_jogo,         
-    output       enderecoIgualLimite, 
+    output       fim_jogo,
+    output       enderecoIgualLimite,
     output       jogada_feita,
+    output       timeout,
+    output       timeout_led,
+    output       fim_sequencia,
+    output       timeout_habilitado,
+
+    // -- Saída RGB para os LEDs da placa --------------------------------------
+    output [2:0] rgb,
+
+    // -- Depuração ------------------------------------------------------------
     output       db_tem_jogada,
     output       db_enable_timeout,
     output [3:0] db_contagem,
     output [3:0] db_memoria,
     output [3:0] db_limite,
-    output       timeout,
     output [3:0] db_jogada,
-    output       db_modo,
-    output [2:0] rgb,
-    output       timeout_led,
-    output       fim_sequencia
+    output       db_modo
 );
+
     wire [3:0] s_endereco;
-    wire [3:0] s_dado, s_botoes; 
+    wire [3:0] s_dado;           // cor esperada (valor lido da RAM)
+    wire [3:0] s_botoes;
     wire [3:0] s_limite;
     wire [3:0] s_jogo_limite;
     wire       s_tem_jogada;
-    wire       s_modo;
+    wire       s_modo;           // 0 = completo (16 rodadas), 1 = demonstração (4 rodadas)
+    wire       s_timeout_habilitado;
     wire [2:0] s_rgb;
-    
-    assign s_tem_jogada = |botoes; 
-    assign db_tem_jogada = s_tem_jogada;
+
+    assign s_tem_jogada      = |botoes;
+    assign db_tem_jogada     = s_tem_jogada;
     assign db_enable_timeout = enable_timeout;
 
+    // configuracao[0] = modo, configuracao[1] = timeout habilitado
     registrador_1 reg_modo (
         .clock(clock),
         .clear(zera_modo),
         .enable(registra_modo),
-        .D(modo),
+        .D(configuracao[0]),
         .Q(s_modo)
     );
 
-    // Fim de rodada
-    assign s_jogo_limite = (s_modo == 1'b0) ? 4'b1111 : 4'b0011;
+    registrador_1 reg_timeout_hab (
+        .clock(clock),
+        .clear(zera_modo),
+        .enable(registra_modo),
+        .D(configuracao[1]),
+        .Q(s_timeout_habilitado)
+    );
+
+    assign s_jogo_limite = (s_modo == 1'b0) ? 4'b1111   // completo: 16 rodadas
+                                            : 4'b0011;  // demonstração: 4 rodadas
 
     comparador_85 compFimRodada (
-        .A(s_endereco),
-        .B(s_limite),
+        .A(s_endereco), .B(s_limite),
         .ALBi(1'b0), .AGBi(1'b0), .AEBi(1'b1),
         .AEBo(enderecoIgualLimite),
         .ALBo(), .AGBo()
     );
 
     comparador_85 compFimJogo (
-        .A(s_limite),
-        .B(s_jogo_limite),
+        .A(s_limite), .B(s_jogo_limite),
         .ALBi(1'b0), .AGBi(1'b0), .AEBi(1'b1),
         .AEBo(fim_jogo),
         .ALBo(), .AGBo()
     );
-   
+
+    comparador_85 comparador (
+        .A(s_dado), .B(s_botoes),
+        .ALBi(1'b0), .AGBi(1'b0), .AEBi(1'b1),
+        .AEBo(igual)
+    );
+
     edge_detector detector (
         .clock(clock),
         .reset(reset),
@@ -79,12 +114,9 @@ module fluxo_dados (
         .pulso(jogada_feita)
     );
 
-    contador_m #(
-        .M(5000),
-        .N(13)
-    ) contador_timeout (
+    contador_m #( .M(5000), .N(13) ) contador_timeout (
         .clock(clock),
-        .zera_as(reset), 
+        .zera_as(reset),
         .zera_s(zera_s_timeout),
         .conta(enable_timeout),
         .Q(),
@@ -92,35 +124,34 @@ module fluxo_dados (
         .meio()
     );
 
-    // Contador da sequência 
+    contador_m #( .M(2000), .N(11) ) contador_led (
+        .clock(clock),
+        .zera_as(reset),
+        .zera_s(zera_s_led),
+        .conta(enable_led),
+        .Q(),
+        .fim(timeout_led),
+        .meio()
+    );
+
     contador_163 contador_addr (
         .clock(clock),
         .clr(~zera_endereco),
-        .ld(1'b1),
-        .ent(1'b1),
+        .ld(1'b1), .ent(1'b1),
         .enp(conta_endereco),
         .D(4'b0000),
         .Q(s_endereco),
-        .rco() 
+        .rco()
     );
 
-    // Contador de rodadas
     contador_163 contLmt (
         .clock(clock),
         .clr(~zera_limite),
-        .ld(1'b1),
-        .ent(1'b1),
+        .ld(1'b1), .ent(1'b1),
         .enp(conta_limite),
         .D(4'b0000),
         .Q(s_limite),
-        .rco() 
-    );
-
-    comparador_85 comparador (
-        .A(s_dado),
-        .B(s_botoes),
-        .ALBi(1'b0), .AGBi(1'b0), .AEBi(1'b1),
-        .AEBo(igual)
+        .rco()
     );
 
     registrador_4 registrador (
@@ -131,48 +162,33 @@ module fluxo_dados (
         .Q(s_botoes)
     );
 
-
-    sync_ram_16x4_file memoria(
+    // RAM inicializada por arquivo (ram_init.txt)
+    sync_ram_16x4_file memoria (
         .clk(clock),
-         .we(registra_jogada),
-         .data(botoes),
-         .addr(s_endereco),
-         .q(s_dado)
+        .we(registra_jogada),
+        .data(botoes),
+        .addr(s_endereco),
+        .q(s_dado)
     );
 
-    corzinha converter_cor (
+    cores_rgb converter_cor (
         .codigo(s_dado),
         .rgb(s_rgb)
     );
 
-
-    mux2x1_n #(
-        .N(3)
-    ) mux_rgb (
+    mux2x1_n #( .N(3) ) mux_rgb (
         .D0(3'b000),
         .D1(s_rgb),
         .S(conf_leds),
         .Y(rgb)
     );
 
-    contador_m #(
-        .M(2000),
-        .N(11)
-    ) contador_led (
-        .clock(clock),
-        .zera_as(reset), 
-        .zera_s(zera_s_led),
-        .conta(enable_led),
-        .Q(),
-        .fim(timeout_led),
-        .meio()
-    );
-
-    assign db_contagem = s_endereco;
-    assign db_jogada   = s_botoes;
-    assign db_memoria  = s_dado;
-    assign db_limite   = s_limite;
-    assign db_modo     = s_modo;
-    assign fim_sequencia = enderecoIgualLimite; 
+    assign db_contagem        = s_endereco;
+    assign db_jogada          = s_botoes;
+    assign db_memoria         = s_dado;
+    assign db_limite          = s_limite;
+    assign db_modo            = s_modo;
+    assign fim_sequencia      = enderecoIgualLimite;
+    assign timeout_habilitado = s_timeout_habilitado;
 
 endmodule

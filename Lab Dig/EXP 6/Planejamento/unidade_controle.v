@@ -1,90 +1,135 @@
+// ---------------------------------------------------------------------------
+// Módulo: unidade_controle
+// ---------------------------------------------------------------------------
+// FSM (Máquina de Estados Finita) do jogo.
+//
+// Controla o fluxo do jogo em três fases principais:
+//   1. EXIBIÇÃO  – apresenta a sequência de cores nos LEDs RGB, uma a uma,
+//                   com intervalo apagado entre cada cor.
+//   2. RESPOSTA  – aguarda as jogadas do jogador, registra cada botão
+//                   pressionado e compara com a sequência armazenada.
+//   3. EXPANSÃO  – após acerto completo, solicita ao jogador um novo
+//                   elemento para expandir a sequência (modo cumulativo).
+//
+// ---------------------------------------------------------------------------
 module unidade_controle (
+    // -- Sinais globais -------------------------------------------------------
     input      clock,
     input      reset,
-    input      iniciar,             // jogar
-    input      fim_jogo,            // Limite atingiu o maximo e acabou a sequencia
-    input      enderecoIgualLimite, // Fim da sequencia atual
+
+    // -- Entradas de controle do jogo -----------------------------------------
+    input      iniciar,             // pulso do botão "jogar"
+    input      fim_jogo,
+    input      enderecoIgualLimite,
     input      jogada,
     input      igual,
     input      timeout,
+    input      timeout_habilitado,
     input      timeout_led,
     input      fim_sequencia,
-    output reg zera_endereco,       // Zera contador da sequencia
-    output reg conta_endereco,      // Incrementa contador da sequencia
-    output reg zera_limite,         // Zera contador de rodadas
-    output reg conta_limite,        // Incrementa contador de rodadas
+
+    // -- Saídas de comando para o fluxo de dados ------------------------------
+    output reg zera_endereco,
+    output reg conta_endereco,
+    output reg zera_limite,
+    output reg conta_limite,
     output reg zeraR,
     output reg registrarR,
     output reg registra_modo,
     output reg zera_modo,
-    output reg acertou,             // ganhou
-    output reg errou,               // perdeu
-    output reg pronto,
-    output reg [3:0] db_estado,
-    output reg db_timeout,
     output reg zera_s_timeout,
     output reg enable_timeout,
     output reg conf_leds,
     output reg registra_jogada,
     output reg zera_s_led,
-    output reg enable_led
+    output reg enable_led,
+
+    // -- Sinais de status / resultado -----------------------------------------
+    output reg acertou,
+    output reg errou,
+    output reg pronto,
+
+    // -- Depuração ------------------------------------------------------------
+    output reg [3:0] db_estado,
+    output reg db_timeout
 );
 
     reg [3:0] Eatual, Eprox;
 
-    // Definição dos estados
-    parameter inicial         = 4'b0000; // inicial
-    parameter preparacao      = 4'b0001; // inicializa elementos
-    parameter carrega_led     = 4'b0010; // carrega a jogada no led
-    parameter mostra_led      = 4'b0011; // mostra a jogada no led
-    parameter zera_led        = 4'b0100; // após o timer, apaga o led
-    parameter mostra_apagado  = 4'b0101; // mostra o led apagado por um tempo
-    parameter proximo_led     = 4'b0110; // prepara a proxima jogada no led
-    parameter espera          = 4'b0111;
+    // =========================================================================
+    // Codificação dos estados
+    // =========================================================================
+    //
+    // Fase de exibição da sequência:
+    //   preparacao  → carrega_led → mostra_led ⇄ (espera timer)
+    //                 ↑             zera_led → mostra_apagado → proximo_led ─┘
+    //
+    // Fase de resposta do jogador:
+    //   espera → registra → comparacao ──→ proximo (próximo item)
+    //                                  └─→ adiciona_jogada (rodada concluída)
+    //                                  └─→ final_erro / final_acerto
+    //
+    parameter inicial         = 4'b0000;
+    parameter preparacao      = 4'b0001; // registra configuração e zera contadores
+    parameter carrega_led     = 4'b0010;
+    parameter mostra_led      = 4'b0011;
+    parameter zera_led        = 4'b0100;
+    parameter mostra_apagado  = 4'b0101;
+    parameter proximo_led     = 4'b0110;
+    parameter espera          = 4'b0111; // com timeout opcional
     parameter registra        = 4'b1000;
     parameter comparacao      = 4'b1001;
-    parameter proximo         = 4'b1010; // próximo endereco dentro da sequencia
+    parameter proximo         = 4'b1010;
     parameter final_acerto    = 4'b1011;
     parameter final_erro      = 4'b1100;
-    parameter adiciona_jogada = 4'b1101; // apos acertar as jogadas, o jogador adiciona uma nova ao final da sequencia 
-    parameter proxima_rodada  = 4'b1110; // incrementa limite
+    parameter adiciona_jogada = 4'b1101; // aguarda novo elemento para expandir sequência
+    parameter proxima_rodada  = 4'b1110;
     parameter final_timeout   = 4'b1111;
 
+    // =========================================================================
+    // Registrador de estado (com reset assíncrono)
+    // =========================================================================
     always @(posedge clock or posedge reset) begin
         if (reset) Eatual <= inicial;
-        else Eatual <= Eprox;
+        else       Eatual <= Eprox;
     end
 
+    // =========================================================================
+    // Lógica de próximo estado
+    // =========================================================================
     always @* begin
         case (Eatual)
             inicial:        Eprox = iniciar ? preparacao : inicial;
             preparacao:     Eprox = carrega_led;
+
+            // --- Exibição da sequência (LED aceso → apagado → próximo) -------
             carrega_led:    Eprox = mostra_led;
             mostra_led:     Eprox = timeout_led ? zera_led : mostra_led;
             zera_led:       Eprox = mostra_apagado;
-            mostra_apagado: Eprox = ~timeout_led ? mostra_apagado : fim_sequencia ? espera : proximo_led;
+            mostra_apagado: Eprox = ~timeout_led  ? mostra_apagado :
+                                    fim_sequencia  ? espera         : proximo_led;
             proximo_led:    Eprox = carrega_led;
-            espera:         if (timeout) Eprox = final_timeout;
+
+            // --- Fase de resposta do jogador ---------------------------------
+            espera:         if (timeout && timeout_habilitado) Eprox = final_timeout;
                             else Eprox = jogada ? registra : espera;
             registra:       Eprox = comparacao;
+
             comparacao:     begin
-                                if (!igual) 
+                                if (!igual)
                                     Eprox = final_erro;
-                                else begin
-                                    // Se acertou, verifica se terminou a sequencia atual
-                                    if (enderecoIgualLimite) begin
-                                        // Se terminou sequencia, verifica se era a ULTIMA rodada
-                                        if (fim_jogo) Eprox = final_acerto;
-                                        else Eprox = adiciona_jogada;
-                                    end else begin
-                                        // Se nao terminou sequencia, vai para proximo item
-                                        Eprox = proximo;
-                                    end
-                                end
+                                else if (enderecoIgualLimite)
+                                    Eprox = fim_jogo ? final_acerto : adiciona_jogada;
+                                else
+                                    Eprox = proximo;
                             end
+
+            // --- Expansão da sequência e avanço de rodada --------------------
             adiciona_jogada:Eprox = jogada ? proxima_rodada : adiciona_jogada;
             proximo:        Eprox = espera;
             proxima_rodada: Eprox = carrega_led;
+
+            // --- Estados terminais (reiniciáveis com "jogar") ----------------
             final_acerto:   Eprox = iniciar ? preparacao : final_acerto;
             final_erro:     Eprox = iniciar ? preparacao : final_erro;
             final_timeout:  Eprox = iniciar ? preparacao : final_timeout;
@@ -92,41 +137,43 @@ module unidade_controle (
         endcase
     end
 
-    // Sinais de controle do fluxo de dados
-    always @* begin        
-        // Inicio do jogo OU mudanca de rodada
-        zera_endereco = (Eatual == preparacao || Eatual == proxima_rodada);
+    // =========================================================================
+    // Lógica de saída
+    // =========================================================================
+    always @* begin
+        zera_endereco  = (Eatual == preparacao || Eatual == proxima_rodada);
 
-        // dentro da mesma rodada
-        conta_endereco = (Eatual == proximo || Eatual == proximo_led || (Eatual == comparacao && igual && enderecoIgualLimite));
-        
-        // inicio total do jogo
-        zera_limite = (Eatual == preparacao);
+        // Avanço antecipado ao acertar o último item: o endereço já aponta
+        // para a posição livre usada em adiciona_jogada.
+        conta_endereco = (Eatual == proximo || Eatual == proximo_led
+                          || (Eatual == comparacao && igual && enderecoIgualLimite));
 
-        // passar de rodada
-        conta_limite = (Eatual == proxima_rodada);
+        zera_limite    = (Eatual == preparacao);
+        conta_limite   = (Eatual == proxima_rodada);
 
-        zeraR      = (Eatual == preparacao || Eatual == proxima_rodada); 
-        registrarR = (Eatual == registra);
+        zeraR          = (Eatual == preparacao || Eatual == proxima_rodada);
+        registrarR     = (Eatual == registra);
 
-        // controle do registrador de modo
-        zera_modo     = (Eatual == inicial);
-        registra_modo = (Eatual == preparacao);
+        zera_modo      = (Eatual == inicial);
+        registra_modo  = (Eatual == preparacao);
 
-        // reseta o timer toda vez que voltamos a esperar uma nova jogada
-        zera_s_timeout = (Eatual == preparacao || Eatual == proximo || Eatual == proxima_rodada || Eatual == inicial);
+        // Zerado em todos os predecessores de "espera" para evitar
+        // timeout residual acumulado de rodadas anteriores.
+        zera_s_timeout = (Eatual == preparacao || Eatual == proximo
+                          || Eatual == proxima_rodada || Eatual == inicial);
         enable_timeout = (Eatual == espera);
-        
-        // sinais de saídas
-        acertou    = (Eatual == final_acerto);
-        errou      = (Eatual == final_erro);
-        pronto     = (Eatual == final_timeout || Eatual == final_acerto || Eatual == final_erro);
-        
-        // sinais leds
+
+        acertou = (Eatual == final_acerto);
+        errou   = (Eatual == final_erro);
+        pronto  = (Eatual == final_timeout || Eatual == final_acerto || Eatual == final_erro);
+
+        // Condicionada ao pulso de jogada para evitar escrita espúria
+        // na borda de entrada do estado.
         registra_jogada = (Eatual == adiciona_jogada && jogada);
-        zera_s_led = ((Eatual == carrega_led) || (Eatual == zera_led));
-        enable_led = ((Eatual == mostra_led) || (Eatual == mostra_apagado));
-        conf_leds = (Eatual == zera_led);
+
+        zera_s_led = (Eatual == carrega_led || Eatual == zera_led);
+        enable_led = (Eatual == mostra_led  || Eatual == mostra_apagado);
+        conf_leds  = (Eatual == mostra_led);
 
         db_estado  = Eatual;
         db_timeout = (Eatual == final_timeout);
