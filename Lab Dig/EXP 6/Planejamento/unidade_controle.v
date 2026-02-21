@@ -141,7 +141,8 @@ module unidade_controle (
     // Lógica de saída
     // =========================================================================
     always @* begin
-        zera_endereco  = (Eatual == preparacao || Eatual == proxima_rodada);
+        // BUG: alterei pra zerar o endereço depois da luz mostrar, caso contrário ele fica preso comparando com a primeira jogada sempre 
+        zera_endereco  = (Eatual == preparacao || Eatual == proxima_rodada || (Eatual == mostra_apagado && fim_sequencia && timeout_led));
 
         // Avanço antecipado ao acertar o último item: o endereço já aponta
         // para a posição livre usada em adiciona_jogada.

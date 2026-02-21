@@ -130,29 +130,39 @@ module jogo_desafio_memoria_tb;
         jogar = 1;
         #40 jogar = 0;
 
-        // Rodada 1 (Limite = 0)
+        // Rodada 1 (Limite = 0) - Deve jogar 0001
         $display("[%0t] Rodada 1: Aguardando LEDs...", $time);
         wait_leds(1);
         $display("[%0t] Rodada 1: Inserindo jogada (0001)...", $time);
         press_button(4'b0001); // Acerta a cor inicial da RAM
         
         // Aguarda estado de adicionar nova cor (adiciona_jogada = 4'b1101)
-        wait(dut.unidade_controle.Eatual == 4'b1101); 
+        wait(dut.unidade_controle.Eatual == 4'b1101 || dut.perdeu); 
+        if (dut.perdeu) begin
+            $display("ERRO: O jogo entrou no estado de derrota inesperadamente na Rodada 1!");
+            $stop;
+        end
+
         $display("[%0t] Rodada 1: Adicionando nova cor (0010)...", $time);
         press_button(4'b0010); // Adiciona azul
 
-        // Rodada 2 (Limite = 1)
+        // Rodada 2 (Limite = 1) - Deve jogar 0001, 0010
         $display("[%0t] Rodada 2: Aguardando LEDs...", $time);
         wait_leds(2);
         $display("[%0t] Rodada 2: Inserindo jogadas (0001, 0010)...", $time);
         press_button(4'b0001);
         press_button(4'b0010);
         
-        wait(dut.unidade_controle.Eatual == 4'b1101);
+        wait(dut.unidade_controle.Eatual == 4'b1101 || dut.perdeu);
+        if (dut.perdeu) begin
+            $display("ERRO: O jogo entrou no estado de derrota inesperadamente na Rodada 2!");
+            $stop;
+        end
+
         $display("[%0t] Rodada 2: Adicionando nova cor (0100)...", $time);
         press_button(4'b0100); // Adiciona amarelo
 
-        // Rodada 3 (Limite = 2)
+        // Rodada 3 (Limite = 2) - Deve jogar 0001, 0010, 0100
         $display("[%0t] Rodada 3: Aguardando LEDs...", $time);
         wait_leds(3);
         $display("[%0t] Rodada 3: Inserindo jogadas (0001, 0010, 0100)...", $time);
@@ -160,11 +170,16 @@ module jogo_desafio_memoria_tb;
         press_button(4'b0010);
         press_button(4'b0100);
         
-        wait(dut.unidade_controle.Eatual == 4'b1101);
+        wait(dut.unidade_controle.Eatual == 4'b1101 || dut.perdeu);
+        if (dut.perdeu) begin
+            $display("ERRO: O jogo entrou no estado de derrota inesperadamente na Rodada 3!");
+            $stop;
+        end
+
         $display("[%0t] Rodada 3: Adicionando nova cor (1000)...", $time);
         press_button(4'b1000); // Adiciona verde
 
-        // Rodada 4 (Limite = 3) - Última rodada
+        // Rodada 4 (Limite = 3) - Última rodada - Deve jogar 0001, 0010, 0100, 1000
         $display("[%0t] Rodada 4: Aguardando LEDs...", $time);
         wait_leds(4);
         $display("[%0t] Rodada 4: Inserindo jogadas finais (0001, 0010, 0100, 1000)...", $time);
@@ -174,7 +189,11 @@ module jogo_desafio_memoria_tb;
         press_button(4'b1000);
 
         // Aguarda estado de vitória (final_acerto = 4'b1011)
-        wait(ganhou == 1);
+        wait(ganhou == 1 || perdeu == 1);
+        if (perdeu) begin
+            $display("ERRO: O jogo perdeu na ultima rodada!");
+            $stop;
+        end
         $display("[%0t] TESTE 1 CONCLUIDO: Vitoria detectada com sucesso!", $time);
         #1000;
 
