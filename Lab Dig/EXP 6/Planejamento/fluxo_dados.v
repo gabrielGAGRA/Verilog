@@ -173,14 +173,14 @@ module fluxo_dados (
 
     cores_rgb converter_cor (
         .codigo(s_dado),
-        .rgb(s_rgb)
+        .leds_rgb(s_rgb)
     );
 
-    mux2x1_n #( .N(3) ) mux_rgb (
+    mux2x1_n #( .BITS(3) ) mux_rgb (
         .D0(3'b000),
         .D1(s_rgb),
-        .S(conf_leds),
-        .Y(rgb)
+        .SEL(conf_leds),
+        .OUT(rgb)
     );
 
     assign db_contagem        = s_endereco;
