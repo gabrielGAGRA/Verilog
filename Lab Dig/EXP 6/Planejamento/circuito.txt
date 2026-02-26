@@ -1,0 +1,544 @@
+// ---------------------------------------------------------------------------
+// Módulo: fluxo_dados
+// ---------------------------------------------------------------------------
+// Caminho dos dados do jogo. Interliga memória, contadores,
+// comparadores, temporizadores e registradores sob comando da
+// unidade de controle.
+// ---------------------------------------------------------------------------
+module fluxo_dados (
+    // -- Sinais globais -------------------------------------------------------
+    input        clock,
+    input        reset,
+
+    // -- Comandos vindos da unidade de controle -------------------------------
+    input        zera_endereco,
+    input        conta_endereco,
+    input        zera_limite,
+    input        conta_limite,
+    input        zeraR,
+    input        registrarR,
+    input        zera_s_timeout,
+    input        enable_timeout,
+    input        registra_modo,
+    input        zera_modo,
+    input        conf_leds,        // 1 = exibe cor no RGB; 0 = LED apagado
+    input        registra_jogada,  // habilita a escrita na RAM
+    input        zera_s_led,
+    input        enable_led,
+
+    // -- Entradas do jogador --------------------------------------------------
+    input  [3:0] botoes,
+    input  [1:0] configuracao,     // [0] modo, [1] timeout habilitado
+
+    // -- Flags de status para a unidade de controle ---------------------------
+    output       igual,
+    output       fim_jogo,
+    output       enderecoIgualLimite,
+    output       jogada_feita,
+    output       timeout,
+    output       timeout_led,
+    output       fim_sequencia,
+    output       timeout_habilitado,
+
+    // -- Saída RGB para os LEDs da placa --------------------------------------
+    output [2:0] rgb,
+    output [3:0] leds,
+
+    // -- Depuração ------------------------------------------------------------
+    output       db_tem_jogada,
+    output       db_enable_timeout,
+    output [3:0] db_contagem,
+    output [3:0] db_memoria,
+    output [3:0] db_limite,
+    output [3:0] db_jogada,
+    output       db_modo
+);
+
+    wire [3:0] s_endereco;
+    wire [3:0] s_dado;           // cor esperada (valor lido da RAM)
+    wire [3:0] s_botoes;
+    wire [3:0] s_limite;
+    wire [3:0] s_jogo_limite;
+    wire       s_tem_jogada;
+    wire       s_modo;           // 0 = completo (16 rodadas), 1 = demonstração (4 rodadas)
+    wire       s_timeout_habilitado;
+    wire [2:0] s_rgb;
+
+    assign s_tem_jogada      = |botoes;
+    assign db_tem_jogada     = s_tem_jogada;
+    assign db_enable_timeout = enable_timeout;
+
+    // configuracao[0] = modo, configuracao[1] = timeout habilitado
+    registrador_1 reg_modo (
+        .clock(clock),
+        .clear(zera_modo),
+        .enable(registra_modo),
+        .D(configuracao[0]),
+        .Q(s_modo)
+    );
+
+    registrador_1 reg_timeout_hab (
+        .clock(clock),
+        .clear(zera_modo),
+        .enable(registra_modo),
+        .D(configuracao[1]),
+        .Q(s_timeout_habilitado)
+    );
+
+    assign s_jogo_limite = (s_modo == 1'b0) ? 4'b1111   // completo: 16 rodadas
+                                            : 4'b0011;  // demonstração: 4 rodadas
+
+    comparador_85 compFimRodada (
+        .A(s_endereco), .B(s_limite),
+        .ALBi(1'b0), .AGBi(1'b0), .AEBi(1'b1),
+        .AEBo(enderecoIgualLimite),
+        .ALBo(), .AGBo()
+    );
+
+    comparador_85 compFimJogo (
+        .A(s_limite), .B(s_jogo_limite),
+        .ALBi(1'b0), .AGBi(1'b0), .AEBi(1'b1),
+        .AEBo(fim_jogo),
+        .ALBo(), .AGBo()
+    );
+
+    comparador_85 comparador (
+        .A(s_dado), .B(s_botoes),
+        .ALBi(1'b0), .AGBi(1'b0), .AEBi(1'b1),
+        .AEBo(igual)
+    );
+
+    edge_detector detector (
+        .clock(clock),
+        .reset(reset),
+        .sinal(s_tem_jogada),
+        .pulso(jogada_feita)
+    );
+
+    contador_m #( .M(5000), .N(13) ) contador_timeout (
+        .clock(clock),
+        .zera_as(reset),
+        .zera_s(zera_s_timeout),
+        .conta(enable_timeout),
+        .Q(),
+        .fim(timeout),
+        .meio()
+    );
+
+    contador_m #( .M(2000), .N(11) ) contador_led (
+        .clock(clock),
+        .zera_as(reset),
+        .zera_s(zera_s_led),
+        .conta(enable_led),
+        .Q(),
+        .fim(timeout_led),
+        .meio()
+    );
+
+    contador_163 contador_addr (
+        .clock(clock),
+        .clr(~zera_endereco),
+        .ld(1'b1), .ent(1'b1),
+        .enp(conta_endereco),
+        .D(4'b0000),
+        .Q(s_endereco),
+        .rco()
+    );
+
+    contador_163 contLmt (
+        .clock(clock),
+        .clr(~zera_limite),
+        .ld(1'b1), .ent(1'b1),
+        .enp(conta_limite),
+        .D(4'b0000),
+        .Q(s_limite),
+        .rco()
+    );
+
+    registrador_4 registrador (
+        .clock(clock),
+        .clear(zeraR),
+        .enable(registrarR),
+        .D(botoes),
+        .Q(s_botoes)
+    );
+
+    // RAM inicializada por arquivo (ram_init.txt)
+    sync_ram_16x4_file memoria (
+        .clk(clock),
+        .we(registra_jogada),
+        .data(botoes),
+        .addr(s_endereco),
+        .q(s_dado)
+    );
+
+    cores_rgb converter_cor (
+        .codigo(s_dado),
+        .leds_rgb(s_rgb)
+    );
+
+    mux2x1_n #(
+        .BITS(4)
+    ) mux_leds (
+        .D0(s_dado),
+        .D1(4'b0000),
+        .SEL(conf_leds),
+        .OUT(leds)
+    );
+
+    mux2x1_n #(
+        .BITS(3)
+    ) mux_rgb (
+        .D0(3'b000),
+        .D1(s_rgb),
+        .SEL(conf_leds),
+        .OUT(rgb)
+    );
+
+    assign db_contagem        = s_endereco;
+    assign db_jogada          = s_botoes;
+    assign db_memoria         = s_dado;
+    assign db_limite          = s_limite;
+    assign db_modo            = s_modo;
+    assign fim_sequencia      = enderecoIgualLimite;
+    assign timeout_habilitado = s_timeout_habilitado;
+
+endmodule
+
+// ---------------------------------------------------------------------------
+// Módulo: unidade_controle
+// ---------------------------------------------------------------------------
+// FSM (Máquina de Estados Finita) do jogo.
+//
+// Controla o fluxo do jogo em três fases principais:
+//   1. EXIBIÇÃO  – apresenta a sequência de cores nos LEDs RGB, uma a uma,
+//                   com intervalo apagado entre cada cor.
+//   2. RESPOSTA  – aguarda as jogadas do jogador, registra cada botão
+//                   pressionado e compara com a sequência armazenada.
+//   3. EXPANSÃO  – após acerto completo, solicita ao jogador um novo
+//                   elemento para expandir a sequência (modo cumulativo).
+//
+// ---------------------------------------------------------------------------
+module unidade_controle (
+    // -- Sinais globais -------------------------------------------------------
+    input      clock,
+    input      reset,
+
+    // -- Entradas de controle do jogo -----------------------------------------
+    input      iniciar,             // pulso do botão "jogar"
+    input      fim_jogo,
+    input      enderecoIgualLimite,
+    input      jogada,
+    input      igual,
+    input      timeout,
+    input      timeout_habilitado,
+    input      timeout_led,
+    input      fim_sequencia,
+
+    // -- Saídas de comando para o fluxo de dados ------------------------------
+    output reg zera_endereco,
+    output reg conta_endereco,
+    output reg zera_limite,
+    output reg conta_limite,
+    output reg zeraR,
+    output reg registrarR,
+    output reg registra_modo,
+    output reg zera_modo,
+    output reg zera_s_timeout,
+    output reg enable_timeout,
+    output reg conf_leds,
+    output reg registra_jogada,
+    output reg zera_s_led,
+    output reg enable_led,
+
+    // -- Sinais de status / resultado -----------------------------------------
+    output reg acertou,
+    output reg errou,
+    output reg pronto,
+
+    // -- Depuração ------------------------------------------------------------
+    output reg [3:0] db_estado,
+    output reg db_timeout
+);
+
+    reg [3:0] Eatual, Eprox;
+
+    // =========================================================================
+    // Codificação dos estados
+    // =========================================================================
+    //
+    // Fase de exibição da sequência:
+    //   preparacao  → carrega_led → mostra_led ⇄ (espera timer)
+    //                 ↑             zera_led → mostra_apagado → proximo_led ─┘
+    //
+    // Fase de resposta do jogador:
+    //   espera → registra → comparacao ──→ proximo (próximo item)
+    //                                  └─→ adiciona_jogada (rodada concluída)
+    //                                  └─→ final_erro / final_acerto
+    //
+    parameter inicial         = 4'b0000;
+    parameter preparacao      = 4'b0001; // registra configuração e zera contadores
+    parameter carrega_led     = 4'b0010;
+    parameter mostra_led      = 4'b0011;
+    parameter zera_led        = 4'b0100;
+    parameter mostra_apagado  = 4'b0101;
+    parameter proximo_led     = 4'b0110;
+    parameter espera          = 4'b0111; // com timeout opcional
+    parameter registra        = 4'b1000;
+    parameter comparacao      = 4'b1001;
+    parameter proximo         = 4'b1010;
+    parameter final_acerto    = 4'b1011;
+    parameter final_erro      = 4'b1100;
+    parameter adiciona_jogada = 4'b1101; // aguarda novo elemento para expandir sequência
+    parameter proxima_rodada  = 4'b1110;
+    parameter final_timeout   = 4'b1111;
+
+    // =========================================================================
+    // Registrador de estado (com reset assíncrono)
+    // =========================================================================
+    always @(posedge clock or posedge reset) begin
+        if (reset) Eatual <= inicial;
+        else       Eatual <= Eprox;
+    end
+
+    // =========================================================================
+    // Lógica de próximo estado
+    // =========================================================================
+    always @* begin
+        case (Eatual)
+            inicial:        Eprox = iniciar ? preparacao : inicial;
+            preparacao:     Eprox = carrega_led;
+
+            // --- Exibição da sequência (LED aceso → apagado → próximo) -------
+            carrega_led:    Eprox = mostra_led;
+            mostra_led:     Eprox = timeout_led ? zera_led : mostra_led;
+            zera_led:       Eprox = mostra_apagado;
+            mostra_apagado: Eprox = ~timeout_led  ? mostra_apagado :
+                                    fim_sequencia  ? espera         : proximo_led;
+            proximo_led:    Eprox = carrega_led;
+
+            // --- Fase de resposta do jogador ---------------------------------
+            espera:         if (timeout && timeout_habilitado) Eprox = final_timeout;
+                            else Eprox = jogada ? registra : espera;
+            registra:       Eprox = comparacao;
+
+            comparacao:     begin
+                                if (!igual)
+                                    Eprox = final_erro;
+                                else if (enderecoIgualLimite)
+                                    Eprox = fim_jogo ? final_acerto : adiciona_jogada;
+                                else
+                                    Eprox = proximo;
+                            end
+
+            // --- Expansão da sequência e avanço de rodada --------------------
+            adiciona_jogada:Eprox = jogada ? proxima_rodada : adiciona_jogada;
+            proximo:        Eprox = espera;
+            proxima_rodada: Eprox = carrega_led;
+
+            // --- Estados terminais (reiniciáveis com "jogar") ----------------
+            final_acerto:   Eprox = iniciar ? preparacao : final_acerto;
+            final_erro:     Eprox = iniciar ? preparacao : final_erro;
+            final_timeout:  Eprox = iniciar ? preparacao : final_timeout;
+            default:        Eprox = inicial;
+        endcase
+    end
+
+    // =========================================================================
+    // Lógica de saída
+    // =========================================================================
+    always @* begin
+        // BUG: alterei pra zerar o endereço depois da luz mostrar, caso contrário ele fica preso comparando com a primeira jogada sempre 
+        zera_endereco  = (Eatual == preparacao || Eatual == proxima_rodada || (Eatual == mostra_apagado && fim_sequencia && timeout_led));
+
+        // Avanço antecipado ao acertar o último item: o endereço já aponta
+        // para a posição livre usada em adiciona_jogada.
+        conta_endereco = (Eatual == proximo || Eatual == proximo_led
+                          || (Eatual == comparacao && igual && enderecoIgualLimite));
+
+        zera_limite    = (Eatual == preparacao);
+        conta_limite   = (Eatual == proxima_rodada);
+
+        zeraR          = (Eatual == preparacao || Eatual == proxima_rodada);
+        registrarR     = (Eatual == registra);
+
+        zera_modo      = (Eatual == inicial);
+        registra_modo  = (Eatual == preparacao);
+
+        // Zerado em todos os predecessores de "espera" para evitar
+        // timeout residual acumulado de rodadas anteriores.
+        zera_s_timeout = (Eatual == preparacao || Eatual == proximo
+                          || Eatual == proxima_rodada || Eatual == inicial);
+        
+        // TODO: Timeout também está valendo para escolher a nova cor. Não sei se era o intencionado. Verificar.
+        enable_timeout = (Eatual == espera || Eatual == adiciona_jogada);
+
+        acertou = (Eatual == final_acerto);
+        errou   = (Eatual == final_erro);
+        pronto  = (Eatual == final_timeout || Eatual == final_acerto || Eatual == final_erro);
+
+        // Condicionada ao pulso de jogada para evitar escrita espúria
+        // na borda de entrada do estado.
+        registra_jogada = (Eatual == adiciona_jogada && jogada);
+
+        zera_s_led = (Eatual == carrega_led || Eatual == zera_led);
+        enable_led = (Eatual == mostra_led  || Eatual == mostra_apagado);
+        conf_leds  = (Eatual == mostra_led);
+
+        db_estado  = Eatual;
+        db_timeout = (Eatual == final_timeout);
+    end
+endmodule
+
+// ---------------------------------------------------------------------------
+// Módulo: jogo_desafio_memoria  (módulo de topo)
+// ---------------------------------------------------------------------------
+// Integra o fluxo de dados e a unidade de controle do jogo,
+// além de instanciar os decodificadores hexa-7 segmentos para
+// depuração na placa FPGA.
+//
+// Funcionamento ATUAL do jogo:
+//   O jogador observa uma sequência de cores exibida nos LEDs RGB.
+//   Em seguida, reproduz a sequência usando os botões. A cada acerto
+//   completo, a sequência cresce com um elemento escolhido pelo jogador.
+//   O jogo termina em acerto total, erro ou timeout (se habilitado).
+//
+// Configuração (chaves da placa):
+//   configuracao[0] – modo: 0 = completo (16 rodadas), 1 = demonstração (4 rodadas)
+//   configuracao[1] – timeout: 0 = desabilitado, 1 = habilitado
+// ---------------------------------------------------------------------------
+module jogo_desafio_memoria (
+    // -- Entradas da placa ----------------------------------------------------
+    input        clock,
+    input        reset,
+    input        jogar,
+    input  [1:0] configuracao,
+    input  [3:0] botoes,
+
+    // -- Saídas principais ----------------------------------------------------
+    output [2:0] leds_rgb,
+    output       ganhou,
+    output       perdeu,
+    output       pronto,
+    output       timeout,
+    output [3:0] leds,
+
+    // -- Sinais de depuração (displays 7-seg e LEDs da placa) -----------------
+    output       db_igual,
+    output [6:0] db_contagem,
+    output [6:0] db_memoria,
+    output [6:0] db_estado,
+    output [6:0] db_jogadafeita,
+    output       db_clock,
+    output       db_iniciar,
+    output       db_enderecoIgualLimite,
+    output       db_timeout,
+    output       db_modo,
+    output [6:0] db_limite_rodada
+);
+
+    // UC → FD
+    wire zera_endereco, conta_endereco, zera_limite, conta_limite;
+    wire zeraR, registraR, enable_timeout, zera_s_timeout;
+    wire registra_modo, zera_modo;
+    wire conf_leds, registra_jogada, zera_s_led, enable_led;
+
+    // FD → UC
+    wire igual, jogada_feita, tem_jogada;
+    wire enderecoIgualLimite, fim_jogo;
+    wire s_pulso_timeout, timeout_led, fim_sequencia;
+    wire s_timeout_habilitado, s_modo;
+
+    wire [6:0] hexa0, hexa1, hexa2, hexa3, hexa5;
+    wire [3:0] s_contagem, s_memoria, s_estado, s_jogada, s_limite;
+
+    fluxo_dados fluxo_dados (
+        .clock(clock),
+        .reset(reset),
+        .zera_endereco(zera_endereco),
+        .conta_endereco(conta_endereco),
+        .zera_limite(zera_limite),
+        .conta_limite(conta_limite),
+        .zeraR(zeraR),
+        .registrarR(registraR),
+        .zera_s_timeout(zera_s_timeout),
+        .enable_timeout(enable_timeout),
+        .botoes(botoes),
+        .configuracao(configuracao),
+        .registra_modo(registra_modo),
+        .zera_modo(zera_modo),
+        .conf_leds(conf_leds),
+        .registra_jogada(registra_jogada),
+        .zera_s_led(zera_s_led),
+        .enable_led(enable_led),
+        .igual(igual),
+        .fim_jogo(fim_jogo),
+        .enderecoIgualLimite(enderecoIgualLimite),
+        .jogada_feita(jogada_feita),
+        .db_tem_jogada(tem_jogada),
+        .db_enable_timeout(),
+        .db_contagem(s_contagem),
+        .db_memoria(s_memoria),
+        .db_limite(s_limite),
+        .timeout(s_pulso_timeout),
+        .db_jogada(s_jogada),
+        .db_modo(s_modo),
+        .rgb(leds_rgb),
+        .leds(leds),
+        .timeout_habilitado(s_timeout_habilitado),
+        .timeout_led(timeout_led),
+        .fim_sequencia(fim_sequencia)
+    );
+
+    unidade_controle unidade_controle (
+        .clock(clock),
+        .reset(reset),
+        .iniciar(jogar),
+        .fim_jogo(fim_jogo),
+        .enderecoIgualLimite(enderecoIgualLimite),
+        .jogada(jogada_feita),
+        .igual(igual),
+        .timeout(s_pulso_timeout),
+        .timeout_habilitado(s_timeout_habilitado),
+        .timeout_led(timeout_led),
+        .fim_sequencia(fim_sequencia),
+        .zera_endereco(zera_endereco),
+        .conta_endereco(conta_endereco),
+        .zera_limite(zera_limite),
+        .conta_limite(conta_limite),
+        .zeraR(zeraR),
+        .registrarR(registraR),
+        .registra_modo(registra_modo),
+        .zera_modo(zera_modo),
+        .acertou(ganhou),
+        .errou(perdeu),
+        .pronto(pronto),
+        .db_estado(s_estado),
+        .db_timeout(timeout),
+        .zera_s_timeout(zera_s_timeout),
+        .enable_timeout(enable_timeout),
+        .conf_leds(conf_leds),
+        .registra_jogada(registra_jogada),
+        .zera_s_led(zera_s_led),
+        .enable_led(enable_led)
+    );
+
+    hexa7seg HEX0 ( .hexa(s_contagem), .display(hexa0) );
+    hexa7seg HEX1 ( .hexa(s_memoria),  .display(hexa1) );
+    hexa7seg HEX2 ( .hexa(s_jogada),   .display(hexa2) );
+    hexa7seg HEX3 ( .hexa(s_limite),   .display(hexa3) );
+    hexa7seg HEX5 ( .hexa(s_estado),   .display(hexa5) );
+
+    assign db_iniciar              = jogar;
+    assign db_contagem             = hexa0;
+    assign db_memoria              = hexa1;
+    assign db_jogadafeita          = hexa2;
+    assign db_limite_rodada        = hexa3;
+    assign db_estado               = hexa5;
+    assign db_enderecoIgualLimite  = enderecoIgualLimite;
+    assign db_igual                = igual;
+    assign db_clock                = clock;
+    assign db_modo                 = s_modo;
+    assign db_timeout              = timeout;
+
+endmodule
