@@ -1,4 +1,4 @@
-`timescale 1ns/1ns
+`timescale 1ms/1us
 
 module tb_cenario_i;
 
@@ -61,8 +61,8 @@ module tb_cenario_i;
         .db_limite_rodada(db_limite_rodada)
     );
 
-    // Clock
-    always #500 clock = ~clock;
+    // Clock (1kHz: Período 1ms)
+    always #0.5 clock = ~clock;
 
     // Tasks
     task wait_leds;
@@ -74,7 +74,7 @@ module tb_cenario_i;
                 wait(dut.unidade_controle.Eatual == 5'b00101); // mostra_apagado
             end
             wait(dut.unidade_controle.Eatual == 5'b00111); // espera
-            #100;
+            #0.1;
         end
     endtask
 
@@ -82,9 +82,9 @@ module tb_cenario_i;
         input [3:0] btn;
         begin
             botoes = btn;
-            #200; 
+            #4.0; 
             botoes = 4'b0000;
-            #200;
+            #2.0;
         end
     endtask
 
@@ -113,7 +113,7 @@ module tb_cenario_i;
     endtask
 
     initial begin
-        // Sequencia fixa baseada no ram_init.txt assumido
+        // Sequencia fixa baseada no ram_init.txt
         sequencia[0] = 4'b0001; sequencia[1] = 4'b0010; sequencia[2] = 4'b0100; sequencia[3] = 4'b1000;
         sequencia[4] = 4'b0001; sequencia[5] = 4'b0010; sequencia[6] = 4'b0100; sequencia[7] = 4'b1000;
         sequencia[8] = 4'b0001; sequencia[9] = 4'b0010; sequencia[10] = 4'b0100; sequencia[11] = 4'b1000;
@@ -122,28 +122,32 @@ module tb_cenario_i;
         clock = 0; reset = 0; jogar = 0; botoes = 0; configuracao = 0;
 
         // Reset inicial
-        #10 reset = 1; #40 reset = 0; #40;
+        #0.01 reset = 1; #0.04 reset = 0; #0.04;
 
         // ------------ Jogo 1: Modo 01 (Demo, sem timeout), Vitória ------------
         $display(">>> JOGO 1: Modo 01 (Demo, No Timeout) - Vitoria");
         configuracao = 2'b01; 
-        jogar = 1; #40 jogar = 0;
+        jogar = 1; 
+        #1.0; 
+        jogar = 0;
 
         for (k = 0; k < 4; k = k + 1) begin
             play_round(k, (k==3));
         end
         wait(ganhou);
         $display(">>> Jogo 1 finalizado (Vitoria).");
-        #2000;
+        #2.0;
 
         // Reset entre jogos
         $display(">>> Reset entre jogos...");
-        reset = 1; #40 reset = 0; #40;
+        reset = 1; #0.04 reset = 0; #0.04;
 
         // ------------ Jogo 2: Modo 11 (Demo, Com Timeout), Derrota por falha ------------
         $display(">>> JOGO 2: Modo 11 (Demo, Timeout) - Derrota por erro de jogada");
         configuracao = 2'b11;
-        jogar = 1; #40 jogar = 0;
+        jogar = 1; 
+        #1.0;
+        jogar = 0;
 
         // Joga a primeira rodada ok
         play_round(0, 0); 

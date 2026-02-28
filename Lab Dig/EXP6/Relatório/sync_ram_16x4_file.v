@@ -28,7 +28,7 @@ module sync_ram_16x4_file #(
 );
 
     // Variavel RAM (armazena dados)
-    reg [3:0] ram[15:0];
+    reg [3:0] ram[0:15];
 
     // Registra endereco de acesso
     reg [3:0] addr_reg;

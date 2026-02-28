@@ -1,4 +1,4 @@
-`timescale 1ns/1ns
+`timescale 1ms/10us
 
 module tb_cenario_ii;
 
@@ -21,7 +21,7 @@ module tb_cenario_ii;
         .db_timeout(db_timeout), .db_modo(db_modo), .db_configuracao(db_configuracao), .db_escrita(db_escrita), .db_limite_rodada(db_limite_rodada)
     );
 
-    always #500 clock = ~clock;
+    always #0.5 clock = ~clock;
 
     task wait_leds;
         input integer num_leds;
@@ -32,24 +32,33 @@ module tb_cenario_ii;
                 wait(dut.unidade_controle.Eatual == 5'b00101);
             end
             wait(dut.unidade_controle.Eatual == 5'b00111);
-            #100;
+            #0.1;
         end
     endtask
+    
+    integer wait_counter;
 
     initial begin
         clock = 0; reset = 0; jogar = 0; botoes = 0; configuracao = 0;
-        #10 reset = 1; #40 reset = 0; #40;
+        #0.01 reset = 1; #0.04 reset = 0; #0.04;
 
         // ------------ Cenário ii: Derrota por timeout no modo 11 (Demo, Timeout Hab) ------------
         $display(">>> CENARIO ii: Derrota por Timeout (Modo 11)");
         configuracao = 2'b11;
-        jogar = 1; #40 jogar = 0;
+        jogar = 1; 
+        #1.0; 
+        jogar = 0;
 
         $display("Aguardando LEDs...");
         wait_leds(1);
 
         $display("Esperando timeout ocorrer...");
-        wait(timeout || dut.unidade_controle.Eatual == 5'b01111); // final_timeout
+        // Wait loop: espera ate 10 segundos (10000 * 1ms)
+        wait_counter = 0;
+        while (!(timeout || dut.unidade_controle.Eatual == 5'b01111) && wait_counter < 10000) begin
+            #1.0;
+            wait_counter = wait_counter + 1;
+        end
         
         if (perdeu || timeout) $display(">>> Timeout detectado com sucesso!");
         else $display(">>> FALHA: Nao detectou timeout.");
