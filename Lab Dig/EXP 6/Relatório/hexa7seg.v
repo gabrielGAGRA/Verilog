@@ -21,7 +21,7 @@
  */
 
 module hexa7seg (hexa, display);
-    input      [3:0] hexa;
+    input      [4:0] hexa;
     output reg [6:0] display;
 
     /*
@@ -57,10 +57,10 @@ module hexa7seg (hexa, display);
         5'hf:    display = 7'b0001110;
         5'h10:   display = 7'b1111110;		  
         5'h11:   display = 7'b1111101;		 
-		  5'h12:   display = 7'b1111011;
-		  5'h13:   display = 7'b1110111;		  
-		  5'h14:   display = 7'b1101111;
-		  5'h15:   display = 7'b1011111;		  
+		5'h12:   display = 7'b1111011;
+		5'h13:   display = 7'b1110111;		  
+		5'h14:   display = 7'b1101111;
+		5'h15:   display = 7'b1011111;		  
         default: display = 7'b1111111;
     endcase
 endmodule

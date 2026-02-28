@@ -136,11 +136,11 @@ module jogo_desafio_memoria (
         .enable_led(enable_led)
     );
 
-    hexa7seg HEX0 ( .hexa(s_contagem), .display(hexa0) );
-    hexa7seg HEX1 ( .hexa(s_memoria),  .display(hexa1) );
-    hexa7seg HEX2 ( .hexa(s_jogada),   .display(hexa2) );
-    hexa7seg HEX3 ( .hexa(s_limite),   .display(hexa3) );
-    hexa7seg HEX5 ( .hexa(s_estado),   .display(hexa5) );
+    hexa7seg HEX0 ( .hexa({1'b0, s_contagem}), .display(hexa0) );
+    hexa7seg HEX1 ( .hexa({1'b0, s_memoria}),  .display(hexa1) );
+    hexa7seg HEX2 ( .hexa({1'b0, s_jogada}),   .display(hexa2) );
+    hexa7seg HEX3 ( .hexa({1'b0, s_limite}),   .display(hexa3) );
+    hexa7seg HEX5 ( .hexa(s_estado),           .display(hexa5) );
 
     assign db_iniciar              = jogar;
     assign db_contagem             = hexa0;
