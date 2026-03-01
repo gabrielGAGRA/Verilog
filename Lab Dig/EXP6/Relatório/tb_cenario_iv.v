@@ -1,4 +1,4 @@
-`timescale 1ns/1ns
+`timescale 1ms/1us
 
 module tb_cenario_iv;
     reg clock, reset, jogar;
@@ -20,7 +20,7 @@ module tb_cenario_iv;
         .db_timeout(db_timeout), .db_modo(db_modo), .db_configuracao(db_configuracao), .db_escrita(db_escrita), .db_limite_rodada(db_limite_rodada)
     );
 
-    always #500 clock = ~clock;
+    always #0.5 clock = ~clock;
 
     task wait_leds;
         input integer num_leds;
@@ -38,7 +38,7 @@ module tb_cenario_iv;
     task press_button;
         input [3:0] btn;
         begin
-            botoes = btn; #2000; botoes = 0; #2000;
+            botoes = btn; #100; botoes = 0; #100;
         end
     endtask
 
@@ -50,7 +50,7 @@ module tb_cenario_iv;
         $display(">>> CENARIO iv: Derrota Modo Normal (00)");
         configuracao = 2'b00;
         jogar = 1; 
-        #2000; 
+        #2; 
         jogar = 0;
 
         // Rodada 1

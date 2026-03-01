@@ -1,4 +1,4 @@
-`timescale 1ns/1ns
+`timescale 1ms/1us
 
 module tb_cenario_vii;
     reg clock, reset, jogar;
@@ -20,7 +20,7 @@ module tb_cenario_vii;
         .db_timeout(db_timeout), .db_modo(db_modo), .db_configuracao(db_configuracao), .db_escrita(db_escrita), .db_limite_rodada(db_limite_rodada)
     );
 
-    always #500 clock = ~clock;
+    always #0.5 clock = ~clock;
 
     task wait_leds;
         input integer num_leds;
@@ -45,7 +45,7 @@ module tb_cenario_vii;
         // Config Inicial: 01 (Demo)
         configuracao = 2'b01;
         jogar = 1; 
-        #2000; 
+        #2; 
         jogar = 0;
         
         wait_leds(1);

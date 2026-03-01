@@ -82,9 +82,9 @@ module tb_cenario_i;
         input [3:0] btn;
         begin
             botoes = btn;
-            #4.0; 
+            #100; // 100ms
             botoes = 4'b0000;
-            #2.0;
+            #100; // 100ms
         end
     endtask
 

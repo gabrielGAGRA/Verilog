@@ -1,4 +1,4 @@
-`timescale 1ns/1ns
+`timescale 1ms/1us
 
 module tb_cenario_iii;
 
@@ -21,7 +21,7 @@ module tb_cenario_iii;
         .db_timeout(db_timeout), .db_modo(db_modo), .db_configuracao(db_configuracao), .db_escrita(db_escrita), .db_limite_rodada(db_limite_rodada)
     );
 
-    always #500 clock = ~clock;
+    always #0.5 clock = ~clock;
 
     // Tasks duplicate for standalone file execution
     reg [3:0] sequencia [0:15];
@@ -38,19 +38,18 @@ module tb_cenario_iii;
                 wait(dut.unidade_controle.Eatual != 5'b00011); 
             end
             wait(dut.unidade_controle.Eatual == 5'b10000 || dut.unidade_controle.Eatual == 5'b00111); // fim_sequencia_timer ou espera
-            @(negedge clock);
+            #10;
         end
     endtask
 
     task press_button;
         input [3:0] btn;
         begin
-            @(negedge clock);
             botoes = btn;
-            repeat(5) @(negedge clock);
+            #100;
             // Aumentar tempo para garantir detecção do detector de borda
             botoes = 0;
-            repeat(5) @(negedge clock);
+            #100;
         end
     endtask
 
@@ -84,15 +83,15 @@ module tb_cenario_iii;
         sequencia[8] = 4'b0001; sequencia[9] = 4'b0010; sequencia[10] = 4'b0100; sequencia[11] = 4'b1000;
         sequencia[12] = 4'b0001; sequencia[13] = 4'b0010; sequencia[14] = 4'b0100; sequencia[15] = 4'b1000;
 
-        clock = 0; reset = 0; jogar = 0; botoes = 0; #5000; configuracao = 0;
+        clock = 0; reset = 0; jogar = 0; botoes = 0; #5; configuracao = 0;
         #10 reset = 1; #40 reset = 0; #40;
 
         // ------------ Cenário iii: Vitória no modo normal sem timeout (modo 00) ------------
         $display(">>> CENARIO iii: Vitoria Modo Normal (00)");
-        @(negedge clock);
+        #1;
         configuracao = 2'b00; 
         jogar = 1; 
-        repeat(2) @(negedge clock);
+        #1;
         jogar = 0;
 
         for (k = 0; k < 16; k = k + 1) begin

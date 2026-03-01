@@ -1,4 +1,4 @@
-`timescale 1ns/1ns
+`timescale 1ms/1us
 
 module tb_cenario_v;
     reg clock, reset, jogar;
@@ -20,7 +20,7 @@ module tb_cenario_v;
         .db_timeout(db_timeout), .db_modo(db_modo), .db_configuracao(db_configuracao), .db_escrita(db_escrita), .db_limite_rodada(db_limite_rodada)
     );
 
-    always #500 clock = ~clock;
+    always #0.5 clock = ~clock;
 
     // Tasks for gameplay
     reg [3:0] sequencia [0:15];
@@ -42,7 +42,7 @@ module tb_cenario_v;
     task press_button;
         input [3:0] btn;
         begin
-            botoes = btn; #2000; botoes = 0; #2000;
+            botoes = btn; #100; botoes = 0; #100;
         end
     endtask
 
@@ -55,7 +55,7 @@ module tb_cenario_v;
         $display(">>> CENARIO v: Modo 10 (Normal + Timeout)");
         configuracao = 2'b10;
         jogar = 1; 
-        #2000; 
+        #2; 
         jogar = 0;
 
         // Testar funcionamento do timeout
@@ -63,20 +63,20 @@ module tb_cenario_v;
         
         $display("Esperando timeout...");
         // Use a loop similar to tb_cenario_ii to catch timeout reliably
-        // Timeout in mode 10 depends on counters. M=5000, Period=1000ns -> 5ms.
-        // Wait long enough (e.g., 6ms = 6000000ns)
-        // With #100 steps, we need 60000 iterations.
+        // Timeout in mode 10 depends on counters. M=5000, Period=1ms -> 5s.
+        // Wait long enough (e.g., 6s = 6000ms)
+        // With #1.0 steps, we need 6000 iterations.
         
         {timeout_detected, lost} = 0;
-        for (i = 0; i < 70000; i = i + 1) begin
-             #100;
+        for (i = 0; i < 7000; i = i + 1) begin
+             #1.0;
              if (timeout || dut.unidade_controle.Eatual == 5'b01111) begin
                  timeout_detected = 1;
-                 i = 70000; // break
+                 i = 7000; // break
              end
              if (perdeu) begin
                  lost = 1;
-                 i = 70000;
+                 i = 7000;
              end
         end
         

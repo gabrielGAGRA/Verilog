@@ -32,7 +32,7 @@ module tb_cenario_ii;
                 wait(dut.unidade_controle.Eatual == 5'b00101);
             end
             wait(dut.unidade_controle.Eatual == 5'b00111);
-            #0.1;
+            #100;
         end
     endtask
     
@@ -52,9 +52,9 @@ module tb_cenario_ii;
         wait_leds(1);
 
         $display("Esperando timeout");
-        // Wait loop: espera ate 5 segundos (5000 * 1ms)
+        // Wait loop: espera ate 6 segundos (6000 * 1ms) para garantir
         wait_counter = 0;
-        while (!(timeout || dut.unidade_controle.Eatual == 5'b01111) && wait_counter < 5000) begin
+        while (!(timeout || dut.unidade_controle.Eatual == 5'b01111) && wait_counter < 6000) begin
             #1.0;
             wait_counter = wait_counter + 1;
         end

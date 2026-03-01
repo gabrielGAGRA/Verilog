@@ -1,4 +1,4 @@
-`timescale 1ns/1ns
+`timescale 1ms/1us
 
 module tb_cenario_vi;
     reg clock, reset, jogar;
@@ -20,7 +20,7 @@ module tb_cenario_vi;
         .db_timeout(db_timeout), .db_modo(db_modo), .db_configuracao(db_configuracao), .db_escrita(db_escrita), .db_limite_rodada(db_limite_rodada)
     );
 
-    always #500 clock = ~clock;
+    always #0.5 clock = ~clock;
 
     task wait_leds;
         input integer num_leds;
@@ -31,47 +31,46 @@ module tb_cenario_vi;
                 wait(dut.unidade_controle.Eatual == 5'b00101); // mostra_apagado
             end
             wait(dut.unidade_controle.Eatual == 5'b10000 || dut.unidade_controle.Eatual == 5'b00111); // fim_sequencia_timer ou espera
-            @(negedge clock);
+            #10;
         end
     endtask
 
     task press_button;
         input [3:0] btn;
         begin
-            @(negedge clock);
             botoes = btn;
-            repeat(7) @(negedge clock);
+            #100;
             botoes = 0;
-            repeat(7) @(negedge clock);
+            #100;
         end
     endtask
 
     initial begin
-        clock = 0; reset = 0; jogar = 0; botoes = 0; #5000; configuracao = 0;
+        clock = 0; reset = 0; jogar = 0; botoes = 0; #5; configuracao = 0;
         #10 reset = 1; #40 reset = 0; #40;
 
         // ------------ Cenário vi: Dois jogos simultâneos sem reset (Consecutivos sem reset) ------------
         $display(">>> CENARIO vi: Dois jogos seguidos SEM reset entre eles");
         
         // Jogo 1: Erro rapido
-        @(negedge clock);
+        #1;
         configuracao = 2'b00;
         jogar = 1;
         $display(">>> Iniciando Jogo 1");
-        repeat(2) @(negedge clock);
-        jogar = 0; // Garantir pulso largo para clock de 1us
+        #2;
+        jogar = 0; 
         wait_leds(1);
         press_button(4'b1111); // Erro (esperado 4'b0001 da RAM)
         $display(">>> Errando Jogo 1 para perder");
         wait(perdeu);
         $display(">>> Derrota do Jogo 1");
-        #5000;
+        #5;
         
         // Jogo 2: Iniciar imediatamente sem pulso de RESET
         $display(">>> Iniciando Jogo 2 apenas com botao jogar...");
-        @(negedge clock);
+        #1;
         jogar = 1; 
-        repeat(2) @(negedge clock);
+        #2;
         jogar = 0;
         
         // Se o sistema reiniciou corretamente, deve estar no estado preparacao ou carrega_led
@@ -81,7 +80,7 @@ module tb_cenario_vi;
         wait_leds(1);
         press_button(4'b0001); // Acerto da primeira jogada
         
-        #5000;
+        #5;
         if (dut.unidade_controle.Eatual != 5'b01100 && dut.unidade_controle.Eatual != 5'b01111) 
              $display(">>> Sucesso: Jogo fluiu normalmente. Estado atual: %b", dut.unidade_controle.Eatual);
         else 
