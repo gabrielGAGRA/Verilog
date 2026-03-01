@@ -49,13 +49,12 @@ module tb_cenario_ii;
         #1.0; 
         jogar = 0;
 
-        $display("Aguardando LEDs...");
         wait_leds(1);
 
-        $display("Esperando timeout ocorrer...");
-        // Wait loop: espera ate 10 segundos (10000 * 1ms)
+        $display("Esperando timeout");
+        // Wait loop: espera ate 5 segundos (5000 * 1ms)
         wait_counter = 0;
-        while (!(timeout || dut.unidade_controle.Eatual == 5'b01111) && wait_counter < 10000) begin
+        while (!(timeout || dut.unidade_controle.Eatual == 5'b01111) && wait_counter < 5000) begin
             #1.0;
             wait_counter = wait_counter + 1;
         end

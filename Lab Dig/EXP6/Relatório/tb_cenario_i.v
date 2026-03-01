@@ -139,7 +139,7 @@ module tb_cenario_i;
         #2.0;
 
         // Reset entre jogos
-        $display(">>> Reset entre jogos...");
+        $display(">>> Reset");
         reset = 1; #0.04 reset = 0; #0.04;
 
         // ------------ Jogo 2: Modo 11 (Demo, Com Timeout), Derrota por falha ------------

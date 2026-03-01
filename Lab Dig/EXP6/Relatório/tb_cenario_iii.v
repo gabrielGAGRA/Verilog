@@ -38,17 +38,19 @@ module tb_cenario_iii;
                 wait(dut.unidade_controle.Eatual != 5'b00011); 
             end
             wait(dut.unidade_controle.Eatual == 5'b10000 || dut.unidade_controle.Eatual == 5'b00111); // fim_sequencia_timer ou espera
-            #1000;
+            @(negedge clock);
         end
     endtask
 
     task press_button;
         input [3:0] btn;
         begin
+            @(negedge clock);
             botoes = btn;
-            #2000; // Aumentar tempo para garantir detecção do detector de borda (5000ns clock)
+            repeat(5) @(negedge clock);
+            // Aumentar tempo para garantir detecção do detector de borda
             botoes = 0;
-            #2000;
+            repeat(5) @(negedge clock);
         end
     endtask
 
@@ -63,7 +65,11 @@ module tb_cenario_iii;
                 press_button(sequencia[j]);
             end
             if (!is_last) begin
-                wait(dut.unidade_controle.Eatual == 5'b01101 || dut.unidade_controle.Eatual == 5'b10001); // adiciona_jogada ou atualiza_endereco
+                wait(dut.unidade_controle.Eatual == 5'b01101 || dut.unidade_controle.Eatual == 5'b10001 || dut.unidade_controle.Eatual == 5'b01100); // adiciona_jogada, atualiza_endereco ou final_erro
+                if (dut.unidade_controle.Eatual == 5'b01100) begin
+                    $display(">> ERRO: Jogo foi para final_erro na rodada %0d", n_rod+1);
+                    $stop;
+                end
                 if (dut.unidade_controle.Eatual == 5'b10001) begin
                     wait(dut.unidade_controle.Eatual == 5'b01101);
                 end
@@ -78,13 +84,16 @@ module tb_cenario_iii;
         sequencia[8] = 4'b0001; sequencia[9] = 4'b0010; sequencia[10] = 4'b0100; sequencia[11] = 4'b1000;
         sequencia[12] = 4'b0001; sequencia[13] = 4'b0010; sequencia[14] = 4'b0100; sequencia[15] = 4'b1000;
 
-        clock = 0; reset = 0; jogar = 0; botoes = 0; configuracao = 0;
+        clock = 0; reset = 0; jogar = 0; botoes = 0; #5000; configuracao = 0;
         #10 reset = 1; #40 reset = 0; #40;
 
         // ------------ Cenário iii: Vitória no modo normal sem timeout (modo 00) ------------
         $display(">>> CENARIO iii: Vitoria Modo Normal (00)");
+        @(negedge clock);
         configuracao = 2'b00; 
-        jogar = 1; #40 jogar = 0;
+        jogar = 1; 
+        repeat(2) @(negedge clock);
+        jogar = 0;
 
         for (k = 0; k < 16; k = k + 1) begin
             play_round(k, (k==15));

@@ -31,38 +31,48 @@ module tb_cenario_vi;
                 wait(dut.unidade_controle.Eatual == 5'b00101); // mostra_apagado
             end
             wait(dut.unidade_controle.Eatual == 5'b10000 || dut.unidade_controle.Eatual == 5'b00111); // fim_sequencia_timer ou espera
-            #100;
+            @(negedge clock);
         end
     endtask
 
     task press_button;
         input [3:0] btn;
         begin
+            @(negedge clock);
             botoes = btn;
-            #2000;
+            repeat(7) @(negedge clock);
             botoes = 0;
-            #2000;
+            repeat(7) @(negedge clock);
         end
     endtask
 
     initial begin
-        clock = 0; reset = 0; jogar = 0; botoes = 0; configuracao = 0;
+        clock = 0; reset = 0; jogar = 0; botoes = 0; #5000; configuracao = 0;
         #10 reset = 1; #40 reset = 0; #40;
 
         // ------------ Cenário vi: Dois jogos simultâneos sem reset (Consecutivos sem reset) ------------
         $display(">>> CENARIO vi: Dois jogos seguidos SEM reset entre eles");
         
         // Jogo 1: Erro rapido
+        @(negedge clock);
         configuracao = 2'b00;
-        jogar = 1; #2000 jogar = 0; // Garantir pulso largo para clock de 1us
+        jogar = 1;
+        $display(">>> Iniciando Jogo 1");
+        repeat(2) @(negedge clock);
+        jogar = 0; // Garantir pulso largo para clock de 1us
         wait_leds(1);
         press_button(4'b1111); // Erro (esperado 4'b0001 da RAM)
+        $display(">>> Errando Jogo 1 para perder");
         wait(perdeu);
+        $display(">>> Derrota do Jogo 1");
         #5000;
         
         // Jogo 2: Iniciar imediatamente sem pulso de RESET
         $display(">>> Iniciando Jogo 2 apenas com botao jogar...");
-        jogar = 1; #2000 jogar = 0;
+        @(negedge clock);
+        jogar = 1; 
+        repeat(2) @(negedge clock);
+        jogar = 0;
         
         // Se o sistema reiniciou corretamente, deve estar no estado preparacao ou carrega_led
         wait(dut.unidade_controle.Eatual == 5'b00001 || dut.unidade_controle.Eatual == 5'b00010); 

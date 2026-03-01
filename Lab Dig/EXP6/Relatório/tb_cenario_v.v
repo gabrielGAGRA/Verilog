@@ -59,7 +59,6 @@ module tb_cenario_v;
         jogar = 0;
 
         // Testar funcionamento do timeout
-        $display("Aguardando LEDs...");
         wait_leds(1);
         
         $display("Esperando timeout...");
