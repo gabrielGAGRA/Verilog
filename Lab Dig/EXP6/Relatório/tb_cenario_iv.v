@@ -38,7 +38,7 @@ module tb_cenario_iv;
     task press_button;
         input [3:0] btn;
         begin
-            botoes = btn; #200; botoes = 0; #200;
+            botoes = btn; #2000; botoes = 0; #2000;
         end
     endtask
 
@@ -49,7 +49,9 @@ module tb_cenario_iv;
         // ------------ Cenário iv: Derrota por erro de jogada no modo normal (00) ------------
         $display(">>> CENARIO iv: Derrota Modo Normal (00)");
         configuracao = 2'b00;
-        jogar = 1; #40 jogar = 0;
+        jogar = 1; 
+        #2000; 
+        jogar = 0;
 
         // Rodada 1
         wait_leds(1);

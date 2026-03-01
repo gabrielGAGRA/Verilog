@@ -27,10 +27,10 @@ module tb_cenario_vi;
         integer i;
         begin
             for (i = 0; i < num_leds; i = i + 1) begin
-                wait(dut.unidade_controle.Eatual == 5'b00011);
-                wait(dut.unidade_controle.Eatual == 5'b00101);
+                wait(dut.unidade_controle.Eatual == 5'b00011); // mostra_led
+                wait(dut.unidade_controle.Eatual == 5'b00101); // mostra_apagado
             end
-            wait(dut.unidade_controle.Eatual == 5'b00111);
+            wait(dut.unidade_controle.Eatual == 5'b10000 || dut.unidade_controle.Eatual == 5'b00111); // fim_sequencia_timer ou espera
             #100;
         end
     endtask
@@ -38,7 +38,10 @@ module tb_cenario_vi;
     task press_button;
         input [3:0] btn;
         begin
-            botoes = btn; #200; botoes = 0; #200;
+            botoes = btn;
+            #2000;
+            botoes = 0;
+            #2000;
         end
     endtask
 
@@ -51,28 +54,28 @@ module tb_cenario_vi;
         
         // Jogo 1: Erro rapido
         configuracao = 2'b00;
-        jogar = 1; #40 jogar = 0;
+        jogar = 1; #2000 jogar = 0; // Garantir pulso largo para clock de 1us
         wait_leds(1);
-        press_button(4'b1111); // Erro
+        press_button(4'b1111); // Erro (esperado 4'b0001 da RAM)
         wait(perdeu);
-        #500;
+        #5000;
         
         // Jogo 2: Iniciar imediatamente sem pulso de RESET
         $display(">>> Iniciando Jogo 2 apenas com botao jogar...");
-        jogar = 1; #40 jogar = 0;
+        jogar = 1; #2000 jogar = 0;
         
-        // Se o sistema reiniciou corretamente, deve estar esperando a sequencia
-        wait(dut.unidade_controle.Eatual == 5'b00010); // carrega_led (indica que saiu dos estados finais)
+        // Se o sistema reiniciou corretamente, deve estar no estado preparacao ou carrega_led
+        wait(dut.unidade_controle.Eatual == 5'b00001 || dut.unidade_controle.Eatual == 5'b00010); 
         $display(">>> Jogo 2 iniciou corretamente!");
         
         wait_leds(1);
         press_button(4'b0001); // Acerto da primeira jogada
         
-        #1000;
+        #5000;
         if (dut.unidade_controle.Eatual != 5'b01100 && dut.unidade_controle.Eatual != 5'b01111) 
-             $display(">>> Sucesso: Jogo fluiu normalmente.");
+             $display(">>> Sucesso: Jogo fluiu normalmente. Estado atual: %b", dut.unidade_controle.Eatual);
         else 
-             $display(">>> FALHA: Jogo travado ou em erro.");
+             $display(">>> FALHA: Jogo travado ou em erro. Estado atual: %b", dut.unidade_controle.Eatual);
              
         $stop;
     end

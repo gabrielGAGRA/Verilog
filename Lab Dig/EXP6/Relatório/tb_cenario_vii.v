@@ -44,7 +44,9 @@ module tb_cenario_vii;
         
         // Config Inicial: 01 (Demo)
         configuracao = 2'b01;
-        jogar = 1; #40 jogar = 0;
+        jogar = 1; 
+        #2000; 
+        jogar = 0;
         
         wait_leds(1);
         

@@ -42,7 +42,7 @@ module tb_cenario_v;
     task press_button;
         input [3:0] btn;
         begin
-            botoes = btn; #200; botoes = 0; #200;
+            botoes = btn; #2000; botoes = 0; #2000;
         end
     endtask
 
@@ -54,18 +54,39 @@ module tb_cenario_v;
         // ------------ Cenário v: Modo de operação "10" (Jogo normal com timeout) ------------
         $display(">>> CENARIO v: Modo 10 (Normal + Timeout)");
         configuracao = 2'b10;
-        jogar = 1; #40 jogar = 0;
+        jogar = 1; 
+        #2000; 
+        jogar = 0;
 
         // Testar funcionamento do timeout
         $display("Aguardando LEDs...");
         wait_leds(1);
         
         $display("Esperando timeout...");
-        wait(timeout || dut.unidade_controle.Eatual == 5'b01111); 
+        // Use a loop similar to tb_cenario_ii to catch timeout reliably
+        // Timeout in mode 10 depends on counters. M=5000, Period=1000ns -> 5ms.
+        // Wait long enough (e.g., 6ms = 6000000ns)
+        // With #100 steps, we need 60000 iterations.
         
-        if (perdeu || timeout) $display(">>> Timeout verificado no modo 10.");
+        {timeout_detected, lost} = 0;
+        for (i = 0; i < 70000; i = i + 1) begin
+             #100;
+             if (timeout || dut.unidade_controle.Eatual == 5'b01111) begin
+                 timeout_detected = 1;
+                 i = 70000; // break
+             end
+             if (perdeu) begin
+                 lost = 1;
+                 i = 70000;
+             end
+        end
+        
+        if (timeout_detected || lost) $display(">>> Timeout verificado no modo 10.");
         else $display(">>> FALHA: Timeout nao ocorreu no modo 10.");
 
         $stop;
     end
+    
+    integer i;
+    reg timeout_detected, lost;
 endmodule

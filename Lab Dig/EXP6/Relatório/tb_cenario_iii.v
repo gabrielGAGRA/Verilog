@@ -31,34 +31,24 @@ module tb_cenario_iii;
         input integer num_leds;
         integer i;
         begin
-            // Aguarda o início da sequência de LEDs (sai do estado de preparação/carrega)
-            // Se já estiver em mostra_led ou mostra_apagado, o loop deve funcionar.
-            
             for (i = 0; i < num_leds; i = i + 1) begin
-                // Espera entrar no estado visual (seja mostra_led ou esperando ele)
-                @(posedge dut.unidade_controle.clock);
-                while (dut.unidade_controle.Eatual != 5'b00011) begin
-                    @(posedge dut.unidade_controle.clock);
-                end
-                
-                // Espera sair do estado visual (ir para apagado)
-                while (dut.unidade_controle.Eatual != 5'b00101) begin
-                     @(posedge dut.unidade_controle.clock);
-                end
+                // Espera o LED acender
+                wait(dut.unidade_controle.Eatual == 5'b00011); 
+                // Espera o LED apagar (saiu do estado mostra_led)
+                wait(dut.unidade_controle.Eatual != 5'b00011); 
             end
-            
-            // Espera chegar no estado de espera por jogada
-            while (dut.unidade_controle.Eatual != 5'b00111) begin
-                 @(posedge dut.unidade_controle.clock);
-            end
-            #100;
+            wait(dut.unidade_controle.Eatual == 5'b10000 || dut.unidade_controle.Eatual == 5'b00111); // fim_sequencia_timer ou espera
+            #1000;
         end
     endtask
 
     task press_button;
         input [3:0] btn;
         begin
-            botoes = btn; #200; botoes = 0; #200;
+            botoes = btn;
+            #2000; // Aumentar tempo para garantir detecção do detector de borda (5000ns clock)
+            botoes = 0;
+            #2000;
         end
     endtask
 
@@ -73,7 +63,10 @@ module tb_cenario_iii;
                 press_button(sequencia[j]);
             end
             if (!is_last) begin
-                wait(dut.unidade_controle.Eatual == 5'b01101);
+                wait(dut.unidade_controle.Eatual == 5'b01101 || dut.unidade_controle.Eatual == 5'b10001); // adiciona_jogada ou atualiza_endereco
+                if (dut.unidade_controle.Eatual == 5'b10001) begin
+                    wait(dut.unidade_controle.Eatual == 5'b01101);
+                end
                 press_button(sequencia[n_rod+1]);
             end
         end
@@ -91,9 +84,7 @@ module tb_cenario_iii;
         // ------------ Cenário iii: Vitória no modo normal sem timeout (modo 00) ------------
         $display(">>> CENARIO iii: Vitoria Modo Normal (00)");
         configuracao = 2'b00; 
-        jogar = 1; 
-        #1000; 
-        jogar = 0;
+        jogar = 1; #40 jogar = 0;
 
         for (k = 0; k < 16; k = k + 1) begin
             play_round(k, (k==15));
