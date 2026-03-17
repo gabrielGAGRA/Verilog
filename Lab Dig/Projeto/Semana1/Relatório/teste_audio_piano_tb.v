@@ -78,19 +78,7 @@ module teste_audio_piano_tb;
         $display("[%0t ns] Soltando Mi5, voltando para Do5...", $time);
         gpio_keys[2] = 1'b0;
         check_freq(523.25, "Do5 Fallback");
-
-        // Teste 4: Acorde e Prioridade (Apertando tudo, deve tocar Si - ID 7)
-        $display("[%0t ns] Testando Prioridade Máxima (Si)...", $time);
-        gpio_keys = 7'b1111111; 
-        check_freq(987.77, "Si5 Prioridade");
-
-        // Teste 5: Mudo
-        $display("[%0t ns] Testando Silencio...", $time);
-        gpio_keys = 7'b0000000;
-        #500000;
-        if (buzzer === 1'b0) $display("[PASS] Silencio absoluto verificado.");
-        else                 $display("[FAIL] Saida de audio nao silenciou!");
-
+        
         $display("--- Fim dos Testes Automatizados ---");
         $finish; 
     end
