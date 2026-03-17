@@ -5,7 +5,6 @@
 // ---------------------------------------------------------------------------
 module frequency_lut (
     input  [2:0] nota_id,    // 1=Do, 2=Re, ..., 7=Si
-    input  [1:0] oitava,     // 0=Oitava5, 1=Oitava6, 2=Oitava7
     output reg [17:0] n_ticks
 );
 
@@ -25,8 +24,6 @@ module frequency_lut (
             default: base_freq = 18'd0;
         endcase
 
-        // Transposicao de Oitava via Shift Right (Dividir periodo por 2^n)
-        // Isso dobra a frequencia a cada incremento de oitava.
-        n_ticks = base_freq >> oitava;
+        n_ticks = base_freq;
     end
 endmodule

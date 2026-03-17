@@ -6,7 +6,6 @@ module audio_generator (
     input        clock,         // 50MHz
     input        reset,
     input [17:0] fim_contagem,  // Periodo da nota (calculado para 50MHz)
-    input [3:0]  volume,        // 0-15 (Controle de Intensidade/Duty Cycle)
     input        habilitar,     // Toca apenas se nota estiver pressionada
     output       buzzer
 );
@@ -14,9 +13,8 @@ module audio_generator (
     reg [17:0] contador;
     reg        s_buzzer;
 
-    // O volume maximo (15) corresponde a ~50% de duty cycle (onda quadrada).
-    // Volumes menores geram pulsos mais estreitos, reduzindo a potencia no buzzer.
-    wire [17:0] threshold = (fim_contagem >> 5) * volume; 
+    // Duty cycle fixo de 50% (onda quadrada) para simplificacao inicial
+    wire [17:0] threshold = (fim_contagem >> 1); 
 
     always @(posedge clock or posedge reset) begin
         if (reset) begin
