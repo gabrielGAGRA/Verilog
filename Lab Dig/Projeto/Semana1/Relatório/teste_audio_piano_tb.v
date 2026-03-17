@@ -21,48 +21,78 @@ module teste_audio_piano_tb;
     // Gerador de Clock (50MHz -> Periodo = 20ns)
     always #10 CLOCK_50 = ~CLOCK_50;
 
-    // Bloco de estímulos iniciais
+    // --- Lógica de Medição de Frequência Dinâmica ---
+    time tempo_borda_anterior = 0;
+    real periodo_em_ns;
+    real frequencia_atual_hz;
+
+    // Sempre que o buzzer subir, calculamos a freq baseado no tempo decorrido
+    always @(posedge buzzer) begin
+        if (tempo_borda_anterior != 0) begin
+            periodo_em_ns = $time - tempo_borda_anterior;
+            frequencia_atual_hz = 1_000_000_000.0 / periodo_em_ns;
+        end
+        tempo_borda_anterior = $time;
+    end
+
+    // Task para automatizar a conferência (Asserts)
+    task check_freq(input real freq_esperada, input [127:0] nome_nota);
+        begin
+            #2000000; // Aguarda 2ms para estabilizar a medição da nota
+            // Tolerância de 1% para compensar arredondamentos de divisão inteira no hardware
+            if (frequencia_atual_hz > freq_esperada * 0.99 && frequencia_atual_hz < freq_esperada * 1.01) begin
+                $display("[PASS] %s detectada: %0.2f Hz", nome_nota, frequencia_atual_hz);
+            end else begin
+                $display("[FAIL] %s INCORRETA! Esperado: %0.2f Hz | Lido: %0.2f Hz", 
+                         nome_nota, freq_esperada, frequencia_atual_hz);
+            end
+        end
+    endtask
+
+    // Bloco Principal de Teste
     initial begin
+        // Configuração para extração de ondas (Iverilog/GTKWave)
+        $dumpfile("teste_audio_piano.vcd");
+        $dumpvars(0, teste_audio_piano_tb);
+
         // Inicialização
         CLOCK_50  = 0;
-        reset_n   = 0;  // Reset ativo baixo
+        reset_n   = 0;
         gpio_keys = 7'b0000000;
 
-        $display("Iniciando simulacao...");
+        $display("--- Iniciando Teste de Frequencia Dinamica ---");
 
-        // Segura o reset por 100ns
-        #100;
-        reset_n = 1;
-        #100;
+        #100 reset_n = 1; #100;
 
-        // Cenario 1: Tocar a nota Do (Bit 0)
-        $display("[%0t ns] Pressionando a nota: Do", $time);
+        // Teste 1: Nota Dó (ID 1)
+        $display("[%0t ns] Testando Do5...", $time);
         gpio_keys[0] = 1'b1;
-        #5000000; // Espera 5ms para ver a oscilacao do Do
+        check_freq(523.25, "Do5");
 
-        // Cenario 2: Override segurando Do e apertando Mi (Bit 2)
-        // O audio deve mudar para a frequencia do Mi instantaneamente
-        $display("[%0t ns] Override apertando a nota: Mi (Do ainda pressionado)", $time);
+        // Teste 2: Override Mi (ID 3)
+        $display("[%0t ns] Testando Mi5 (Override)...", $time);
         gpio_keys[2] = 1'b1;
-        #5000000; // Espera mais 5ms
+        check_freq(659.25, "Mi5 Override");
 
-        // Cenario 3: Soltar o Mi. Como o Do ainda esta pressionado, deve voltar ao Do.
-        $display("[%0t ns] Soltando a nota: Mi (Fallback para o Do)", $time);
+        // Teste 3: Fallback (Soltando Mi, volta pro Do)
+        $display("[%0t ns] Soltando Mi5, voltando para Do5...", $time);
         gpio_keys[2] = 1'b0;
-        #5000000; // Espera 5ms para ver o retorno a nota Do
+        check_freq(523.25, "Do5 Fallback");
 
-        // Cenario 4: Tocar um acorde cheio e ver se pega a maior nota
-        $display("[%0t ns] Pressionando varias notas ao mesmo tempo", $time);
-        gpio_keys = 7'b1010101; // Do, Mi, Sol, Si
-        #5000000;
+        // Teste 4: Acorde e Prioridade (Apertando tudo, deve tocar Si - ID 7)
+        $display("[%0t ns] Testando Prioridade Máxima (Si)...", $time);
+        gpio_keys = 7'b1111111; 
+        check_freq(987.77, "Si5 Prioridade");
 
-        // Cenario 5: Soltar tudo (Silencio)
-        $display("[%0t ns] Soltando todas as teclas", $time);
+        // Teste 5: Mudo
+        $display("[%0t ns] Testando Silencio...", $time);
         gpio_keys = 7'b0000000;
-        #2000000; // Espera 2ms para confirmar que ficara mudo
+        #500000;
+        if (buzzer === 1'b0) $display("[PASS] Silencio absoluto verificado.");
+        else                 $display("[FAIL] Saida de audio nao silenciou!");
 
-        $display("[%0t ns] Fim da simulacao.", $time);
-        $stop; // Para a simulação no ModelSim
+        $display("--- Fim dos Testes Automatizados ---");
+        $finish; 
     end
 
 endmodule
