@@ -11,7 +11,7 @@ module teste_audio_piano (
     wire reset = !reset_n;
 
     // 1. Lógica de Prioridade (Override) usa agora os botões diretamente
-    note_priority_logic logic_inst (
+    logica_notas_prioridade logic_inst (
         .clock(CLOCK_50),
         .reset(reset),
         .botoes(gpio_keys),
@@ -26,7 +26,7 @@ module teste_audio_piano (
     );
 
     // 3. Gerador de Áudio (PWM 50%)
-    audio_generator audio_inst (
+    gerador_audio audio_inst (
         .clock(CLOCK_50),
         .reset(reset),
         .fim_contagem(s_n_ticks),

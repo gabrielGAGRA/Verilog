@@ -4,7 +4,7 @@
 // Base: Clock de 50MHz.
 // ---------------------------------------------------------------------------
 module frequency_lut (
-    input  [2:0] nota_id,    // 1=Do, 2=Re, ..., 7=Si
+    input  [2:0] nota_id,    
     output reg [17:0] n_ticks
 );
 
@@ -12,6 +12,8 @@ module frequency_lut (
 
     // Valores calculados para a Oitava 5 (Base > 500Hz)
     // Formula: N = 50.000.000 / Freq_Nota
+    // Aqui simplesmente definimos quantos clocks ele deve contar para cada nota usando a formula acima
+    // Assim, usamos apenas um contador
     always @(*) begin
         case (nota_id)
             3'd1: base_freq = 18'd95557;  // Do5 (523.25 Hz)

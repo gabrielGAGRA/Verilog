@@ -1,11 +1,11 @@
 // ---------------------------------------------------------------------------
-// Modulo: note_priority_logic
+// Modulo: logica_notas_prioridade
 // Descricao: Implementa a prioridade da ultima tecla pressionada.
 // ---------------------------------------------------------------------------
-module note_priority_logic (
+module logica_notas_prioridade (
     input        clock,
     input        reset,
-    input  [6:0] botoes,       // 7 notas (Do=0 a Si=6)
+    input  [6:0] botoes,       // Do=0 a Si=6
     output reg [2:0] nota_id,  // ID da nota ativa (1 a 7)
     output       tem_nota      // Flag se alguma nota deve soar
 );
@@ -20,7 +20,7 @@ module note_priority_logic (
         end else begin
             botoes_ant <= botoes;
 
-            // Logica de Override: Detecta borda de subida em cada botao
+            // Override: Detecta borda de subida em cada botao
             if      (botoes[0] && !botoes_ant[0]) nota_id <= 3'd1; // Do
             else if (botoes[1] && !botoes_ant[1]) nota_id <= 3'd2; // Re
             else if (botoes[2] && !botoes_ant[2]) nota_id <= 3'd3; // Mi
@@ -29,8 +29,7 @@ module note_priority_logic (
             else if (botoes[5] && !botoes_ant[5]) nota_id <= 3'd6; // La
             else if (botoes[6] && !botoes_ant[6]) nota_id <= 3'd7; // Si
             
-            // Fallback: Se a ultima nota ativa foi solta, mas outras estao 
-            // pressionadas, volta para a de maior indice (comportamento previsivel)
+            // Fallback: Se a ultima nota ativa foi solta, mas outras estao pressionadas, volta para a de maior indice (comportamento previsivel)
             if (tem_nota && !botoes[nota_id-1]) begin
                 if      (botoes[6]) nota_id <= 3'd7;
                 else if (botoes[5]) nota_id <= 3'd6;
