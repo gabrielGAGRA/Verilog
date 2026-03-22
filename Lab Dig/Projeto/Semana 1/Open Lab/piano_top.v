@@ -25,7 +25,7 @@ module piano_top (
     // Sinais de interligação FSM <-> Fluxo de Dados
     wire fsm_modo_apr, fsm_zera_end, fsm_conta_end;
     wire fd_pulso_acerto, fd_fim_musica;
-    wire [3:0] dbg_estado;
+    wire [4:0] dbg_estado;
 
     // FSM
     unidade_controle fsm_inst (

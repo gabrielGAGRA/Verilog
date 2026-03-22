@@ -40,7 +40,9 @@ module fluxo_dados (
     );
 
     frequency_lut lut_inst (
-        .nota_id(s_nota_tocada), .oitava(sw_oitava), .n_ticks(s_n_ticks)
+        .nota_id(s_nota_tocada), 
+        //.oitava(sw_oitava), 
+        .n_ticks(s_n_ticks)
     );
 
     gerador_audio audio_inst (
@@ -60,12 +62,10 @@ module fluxo_dados (
         .rco(fim_musica) // Assumindo que a música tem 16 notas (0 a 15)
     );
 
-    sync_ram_16x4_file memoria (
-        .clk(clock),
-        .we(1'b0), // Apenas leitura no Modo Aprendizado (por enquanto)
-        .data(4'b0000),
-        .addr(s_endereco_ram),
-        .q(s_dado_ram)
+    sync_rom_16x4 memoria (
+        .clock(clock),
+        .address(s_endereco_ram),
+        .data_out(s_dado_ram)
     );
 
     // NOVO: Multiplexador de LEDs.
