@@ -2,7 +2,7 @@
 // Modulo: logica_notas_prioridade
 // Descricao: Implementa a prioridade da ultima tecla pressionada.
 // ---------------------------------------------------------------------------
-module logica_notas_prioridade (
+module note_priority_logic (
     input        clock,
     input        reset,
     input  [6:0] botoes,       // Do=0 a Si=6

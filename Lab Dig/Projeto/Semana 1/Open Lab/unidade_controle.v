@@ -15,7 +15,7 @@ module unidade_controle (
     output reg modo_aprendizado,
     output reg zera_endereco,
     output reg conta_endereco,
-    output reg [3:0] estado_hex // Para depuracao em display 7 seg (0 = Livre, 1 = Musica)
+    output reg [4:0] estado_hex // Para depuracao em display 7 seg (0 = Livre, 1 = Musica)
 );
 
     parameter LIVRE = 1'b0, APRENDIZADO = 1'b1;
