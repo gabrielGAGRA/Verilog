@@ -65,9 +65,7 @@ module unidade_controle (
             LIVRE: begin
                 modo_aprendizado = 1'b0;
                 zera_endereco = 1'b1;    // Mantem RAM resetada pro inicio
-                estado_hex = 5'hE;       // Display "E" ou "A" mas a DE0 usa letras para outros codigos: 5'hE exibe letre 'E' de 'fREE' (ou usar "A" pra n. 10/Aberta)
-                // Usei o Hexadecimal '0' nas iteracoes anteriores, deixarei em A de 'Aberta' (Livre)
-                estado_hex = 5'hA;       
+                estado_hex = 5'h0; // Modo Livre
 
                 if (mudou_modo) next_state = INICIA_MUSICA;
             end
@@ -75,7 +73,7 @@ module unidade_controle (
             INICIA_MUSICA: begin
                 modo_aprendizado = 1'b1;
                 zera_endereco = 1'b1;    // Reseta end da ROM
-                estado_hex = 5'h1;       
+                estado_hex = 5'h2;
                 
                 next_state = ESPERA_NOTA;
             end
@@ -90,7 +88,7 @@ module unidade_controle (
             
             COMPARA_NOTA: begin
                 modo_aprendizado = 1'b1; 
-                estado_hex = 5'h3; // Modo Comparacao
+                estado_hex = 5'h2;
                 
                 if (mudou_modo) next_state = LIVRE;
                 else if (acerto_nota) next_state = PROXIMO;
@@ -119,7 +117,7 @@ module unidade_controle (
 
             FIM_MUSICA_ST: begin
                 modo_aprendizado = 1'b0; // Apaga leds pra indicar fim
-                estado_hex = 5'hF; // Mostrar 'F' de Fim
+                estado_hex = 5'h2;
                 
                 if (mudou_modo) next_state = LIVRE;
             end

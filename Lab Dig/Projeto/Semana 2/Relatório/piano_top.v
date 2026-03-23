@@ -2,7 +2,10 @@
 // Modulo: piano_top
 // Descricao: Top-Level do MVP do Piano Adaptativo. Interliga Fluxo de Dados e Controle.
 // ---------------------------------------------------------------------------
-module piano_top (
+module piano_top #(
+    parameter DEBOUNCE_NOTAS = 50_000,
+    parameter DEBOUNCE_MODO  = 250_000
+) (
     input        CLOCK_50,
     input        reset_n,       // Ativo baixo
     input  [6:0] gpio_keys,     // 7 notas
@@ -32,7 +35,7 @@ module piano_top (
 
     // Debouncers unificados (NF_DEBOUNCING_NIVEL)
     // Instancia generica para as teclas do piano (7 bits)
-    debounce #(.WIDTH(7), .TEMPO_FILTRO(50_000)) db_notas (
+    debounce #(.WIDTH(7), .TEMPO_FILTRO(DEBOUNCE_NOTAS)) db_notas (
         .clock(CLOCK_50),
         .reset(reset),
         .in(gpio_keys),
@@ -40,7 +43,7 @@ module piano_top (
     );
 
     // Instancia generica para o botao de modo (1 bit)
-    debounce #(.WIDTH(1), .TEMPO_FILTRO(250_000)) db_modo (
+    debounce #(.WIDTH(1), .TEMPO_FILTRO(DEBOUNCE_MODO)) db_modo (
         .clock(CLOCK_50),
         .reset(reset),
         .in(btn_modo),
@@ -99,7 +102,7 @@ module piano_top (
 
     // HEX1: Oitava atual (fixamos exibir o valor 5 no display baseando na Oitava 5 central do Verilog)
     hexa7seg disp1_inst (
-        .hexa(5'h5), // Valor fixado em 5 para reprensentar Dó5
+        .hexa(5'h2), // Valor fixado em 5 para reprensentar Dó5
         .display(hex1_oitava)
     );
 
@@ -118,6 +121,9 @@ module piano_top (
     );
 
     // HEX5 é acionado diretamente pela saída leds cifra do fluxo_dados. 
-    assign led_vermelho = gpio_keys;
+    
+    // RF_CONTROLE_LED e RF_MUSICA
+    // Multiplexador para acender LED pela nota pressionada (Livre) ou pela nota aguardada da RAM (Aprendizado)
+    assign led_vermelho = (fsm_modo_apr && fd_id_nota != 0) ? (7'b0000001 << (fd_id_nota - 1)) : gpio_keys;
 
 endmodule
