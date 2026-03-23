@@ -11,7 +11,7 @@ module frequency_lut (
     reg [17:0] base_freq;
 
     // Valores calculados para a Oitava 5 (Base > 500Hz)
-    // Formula: N = 50.000.000 / Freq_Nota
+    // N = 50.000.000 / Freq_Nota
     // Aqui simplesmente definimos quantos clocks ele deve contar para cada nota usando a formula acima
     // Assim, usamos apenas um contador
     always @(*) begin

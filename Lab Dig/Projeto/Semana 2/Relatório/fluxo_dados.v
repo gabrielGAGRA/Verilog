@@ -20,16 +20,18 @@ module fluxo_dados (
     output       buzzer,
     output [6:0] leds,
 
-    // -- Status para a Unidade de Controle (FSM) --
-    output       pulso_acerto,     // Vai para 1 quando a nota certa é pressionada
-    output       fim_musica        // Vai para 1 quando o endereço chega no limite
+    // -- Status para a Unidade de Controle (FSM) ou Top-Level --
+    output       tem_nota_ativa,   // Vai para 1 quando há alguma tecla pressionada
+    output       acerto_nota,      // Vai para 1 quando a nota batida for igual a nota lida na RAM
+    output       fim_musica,       // Vai para 1 quando o endereço chega no limite
+    output [3:0] s_endereco_ram,   // Exportado para visualizacao (HEX)
+    output [2:0] s_id_para_led     // ID da nota atual para visualizacao (HEX cifrado)
 );
 
     wire [2:0] s_nota_tocada;
     wire       s_tem_nota;
     wire [17:0] s_n_ticks;
     
-    wire [3:0] s_endereco_ram;
     wire [3:0] s_dado_ram;
     wire [2:0] s_nota_esperada = s_dado_ram[2:0]; // Ignora o MSB, usa só 1 a 7
 
@@ -58,7 +60,7 @@ module fluxo_dados (
         .enp(conta_endereco),
         .D(4'b0000),
         .Q(s_endereco_ram),
-        .rco(fim_musica) // Assumindo que a música tem 16 notas (0 a 15)
+        .rco(fim_musica) 
     );
 
     sync_rom_16x4 memoria (
@@ -67,10 +69,10 @@ module fluxo_dados (
         .data_out(s_dado_ram)
     );
 
-    // NOVO: Multiplexador de LEDs.
+    // Multiplexador de LEDs.
     // No Modo Aprendizado: Mostra a nota vinda da memoria.
     // No Modo Livre: Mostra a nota vinda do teclado (botoes).
-    wire [2:0] s_id_para_led = (modo_aprendizado) ? s_nota_esperada : s_nota_tocada;
+    assign s_id_para_led = (modo_aprendizado) ? s_nota_esperada : s_nota_tocada;
 
     // 3. Logica Visual e Comparação
     decodificador_leds decoder_led (
@@ -78,15 +80,11 @@ module fluxo_dados (
         .leds(leds)
     );
 
-    // O sinal de "match" fica em nível alto enquanto a nota certa for segurada
+    // O sinal de match fica em nível alto enquanto a nota certa for segurada
     wire s_match_cru = (s_nota_tocada == s_nota_esperada) && s_tem_nota && modo_aprendizado;
 
-    // Converte o "match" em um pulso de 1 clock  para a FSM avançar a RAM
-    edge_detector detector_acerto (
-        .clock(clock),
-        .reset(reset),
-        .sinal(s_match_cru),
-        .pulso(pulso_acerto)
-    );
+    // Exportação direta dos níveis lógicos para a máquina de estado (FSM)
+    assign tem_nota_ativa = s_tem_nota;
+    assign acerto_nota = s_match_cru;
 
 endmodule
