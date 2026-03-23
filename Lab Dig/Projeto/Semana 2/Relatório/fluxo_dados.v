@@ -75,9 +75,9 @@ module fluxo_dados (
     assign s_id_para_led = (modo_aprendizado) ? s_nota_esperada : s_nota_tocada;
 
     // 3. Logica Visual e Comparação
-    decodificador_leds decoder_led (
+    decodificador_cifra decoder_cifra_inst (
         .nota_id(s_id_para_led),
-        .leds(leds)
+        .display(leds)
     );
 
     // O sinal de match fica em nível alto enquanto a nota certa for segurada

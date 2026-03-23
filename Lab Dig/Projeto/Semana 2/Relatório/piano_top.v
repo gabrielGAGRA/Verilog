@@ -79,7 +79,7 @@ module piano_top (
         .conta_endereco(fsm_conta_end),
         .zera_endereco(fsm_zera_end),
         .buzzer(buzzer),
-        .leds(led_vermelho),
+        .leds(hex5_cifra),
         .tem_nota_ativa(fd_tem_nota_ativa),
         .acerto_nota(fd_acerto_nota),
         .fim_musica(fd_fim_musica),
@@ -117,10 +117,7 @@ module piano_top (
         .display(hex4_indice)
     );
 
-    // HEX5: Cifra da nota atual (A - G)
-    decodificador_cifra disp5_inst (
-        .nota_id(fd_id_nota),   // 1 a 7 dependendo da entrada ou da RAM
-        .display(hex5_cifra)
-    );
+    // HEX5 é acionado diretamente pela saída leds cifra do fluxo_dados. 
+    assign led_vermelho = gpio_keys;
 
 endmodule
