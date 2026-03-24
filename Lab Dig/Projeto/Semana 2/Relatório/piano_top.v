@@ -135,9 +135,9 @@ module piano_top #(
         .display(hex1_oitava)
     );
 
-    // HEX3 e HEX4: Índice da música (Endereco da RAM)
-    wire [4:0] uni_idx = fd_endereco_ram % 10;
-    wire [4:0] dez_idx = (fd_endereco_ram / 10) % 10;
+    // HEX3 e HEX4: Índice da música
+    wire [4:0] uni_idx = (s_sel_musica + 1) % 10;
+    wire [4:0] dez_idx = ((s_sel_musica + 1) / 10) % 10;
 
     hexa7seg disp3_inst (
         .hexa(uni_idx),
