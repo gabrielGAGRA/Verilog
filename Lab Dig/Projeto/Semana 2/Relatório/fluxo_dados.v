@@ -10,6 +10,7 @@ module fluxo_dados (
     input  [6:0] botoes,       // 7 notas
     input  [1:0] sw_oitava,    // Switches de transposição
     input  [3:0] sw_volume,    // Switches de PWM
+    input  [1:0] sel_musica,   // Seletor de musica
 
     // -- Comandos da Unidade de Controle (FSM) --
     input        modo_aprendizado, // 1 = Aprendizado, 0 = Livre
@@ -24,7 +25,7 @@ module fluxo_dados (
     output       tem_nota_ativa,   // Vai para 1 quando há alguma tecla pressionada
     output       acerto_nota,      // Vai para 1 quando a nota batida for igual a nota lida na RAM
     output       fim_musica,       // Vai para 1 quando o endereço chega no limite
-    output [3:0] s_endereco_ram,   // Exportado para visualizacao (HEX)
+    output [7:0] s_endereco_ram,   // Exportado para visualizacao (HEX)
     output [2:0] s_id_para_led     // ID da nota atual para visualizacao (HEX cifrado)
 );
 
@@ -53,21 +54,44 @@ module fluxo_dados (
     );
 
     // 2. Logica de Memória e Endereçamento
-    contador_163 contador_addr (
+    wire cont_fim;
+    contador_m #(
+        .M(2048), // Tamanho da musica / ROM maximo
+        .N(11)
+    ) contador_addr (
         .clock(clock),
-        .clr(~zera_endereco),
-        .ld(1'b1), .ent(1'b1),
-        .enp(conta_endereco),
-        .D(4'b0000),
+        .zera_as(1'b0),
+        .zera_s(zera_endereco),
+        .conta(conta_endereco),
         .Q(s_endereco_ram),
-        .rco(fim_musica) 
+        .fim(cont_fim),
+        .meio()
     );
 
-    sync_rom_16x4 memoria (
+    wire [3:0] s_dado_ram1, s_dado_ram2;
+
+    sync_rom #(
+        .DATA_WIDTH(4),
+        .ADDR_WIDTH(11),
+        .INIT_FILE("do_re_mi.txt")
+    ) memoria1 (
         .clock(clock),
         .address(s_endereco_ram),
-        .data_out(s_dado_ram)
+        .data_out(s_dado_ram1)
     );
+
+    sync_rom #(
+        .DATA_WIDTH(4),
+        .ADDR_WIDTH(11),
+        .INIT_FILE("au_clair_de_la_lune.txt")
+    ) memoria2 (
+        .clock(clock),
+        .address(s_endereco_ram),
+        .data_out(s_dado_ram2)
+    );
+
+    // Mux de musicas
+    assign s_dado_ram = (sel_musica == 2'd0) ? s_dado_ram1 : s_dado_ram2;
 
     // Multiplexador de LEDs.
     // No Modo Aprendizado: Mostra a nota vinda da memoria.

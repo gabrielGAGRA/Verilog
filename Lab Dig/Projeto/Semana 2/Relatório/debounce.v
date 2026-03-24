@@ -4,7 +4,7 @@
 // ---------------------------------------------------------------------------
 module debounce #(
     parameter WIDTH = 1, 
-    parameter TEMPO_FILTRO = 50_000 // Atraso de 1ms em 50MHz como padrao
+    parameter TEMPO_FILTRO = 250_000 // 5ms pros botoes pequenos
 ) (
     input clock,
     input reset,

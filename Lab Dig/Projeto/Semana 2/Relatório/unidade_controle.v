@@ -31,19 +31,22 @@ module unidade_controle (
 
     reg [2:0] state, next_state;
 
-    // Transicao de Estado baseada no botao (detector de borda incorporado na troca rapida)
-    reg btn_modo_ant;
+    // Transicao de Estado baseada no botao (usando edge_detector)
+    wire mudou_modo;
+    edge_detector ed_modo (
+        .clock(clock),
+        .reset(reset),
+        .sinal(btn_modo),
+        .pulso(mudou_modo)
+    );
+
     always @(posedge clock or posedge reset) begin
         if (reset) begin
             state <= INICIAL;
-            btn_modo_ant <= 1'b0;
         end else begin
-            btn_modo_ant <= btn_modo;
             state <= next_state; 
         end
     end
-
-    wire mudou_modo = (btn_modo && !btn_modo_ant);
 
     // Logica de Proximo Estado e Saidas (Moore + Lógica Limpa)
     always @(*) begin
