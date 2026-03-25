@@ -7,6 +7,7 @@ module tb_piano_top;
     reg [6:0] gpio_keys;
     reg btn_modo;
     reg btn_musica;
+    reg btn_intensidade;
 
     wire buzzer;
     wire [6:0] led_vermelho;
@@ -26,6 +27,7 @@ module tb_piano_top;
         .gpio_keys(gpio_keys),
         .btn_modo(btn_modo),
         .btn_musica(btn_musica),
+        .btn_intensidade(btn_intensidade),
         .buzzer(buzzer),
         .led_vermelho(led_vermelho),
         .hex0_estado(hex0_estado),
@@ -77,6 +79,7 @@ module tb_piano_top;
         gpio_keys = 0;
         btn_modo = 0;
         btn_musica = 0;
+        btn_intensidade = 0;
 
         // Libera do reset
         #50 reset_n = 1;
@@ -114,6 +117,18 @@ module tb_piano_top;
 
         $display("Muda Musica...");
         btn_musica = 1; #100; btn_musica = 0;
+        #200;
+
+        $display("Testando alteracao de intensidade do LED (PWM)...");
+        btn_intensidade = 1; #100; btn_intensidade = 0; // ~75%
+        #200;
+        btn_intensidade = 1; #100; btn_intensidade = 0; // ~50%
+        #200;
+        btn_intensidade = 1; #100; btn_intensidade = 0; // ~25%
+        #200;
+        btn_intensidade = 1; #100; btn_intensidade = 0; // 0%
+        #200;
+        btn_intensidade = 1; #100; btn_intensidade = 0; // Volta para 100%
         #200;
 
         $display("Teste Finalizado.");
