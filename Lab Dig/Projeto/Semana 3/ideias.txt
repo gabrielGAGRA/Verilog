@@ -5,5 +5,6 @@ Implementar bemol/sustenido:
     - Como não sabemos se vamos ter um LED a mais para representar o sustenido, fazer ele tocar a frequencia correta independente da tecla sustenido estar acionada quando no modo música. Basta teclar a nota musical.
 
 Eventualmente implementar controle de oitavas (atualmente hex1_oitava está fixo em 5)
+- Começar a partir da 4 oitava
 
 Eventualmente usar o PWM para regular o áudio do gerador_audio
