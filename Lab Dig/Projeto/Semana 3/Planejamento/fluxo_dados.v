@@ -13,8 +13,8 @@ module fluxo_dados #(
     input  [6:0] botoes,       // 7 notas
     input        btn_modo,     // Troca de modo
     input        btn_musica,   // Troca de musica
+    input        btn_intensidade, // Botao ciclico de Intensidade (PWM)
     input  [1:0] sw_oitava,    // Switches de transposição
-    input  [3:0] sw_volume,    // Switches de PWM
 
     // -- Comandos da Unidade de Controle (FSM) --
     input        modo_aprendizado, // 1 = Aprendizado, 0 = Livre
@@ -38,7 +38,7 @@ module fluxo_dados #(
 );
 
     wire [6:0] s_botoes_db;
-    wire s_btn_modo_db, s_btn_musica_db;
+    wire s_btn_modo_db, s_btn_musica_db, s_btn_intensidade_db;
     
     // Debouncers
     debounce #(.WIDTH(7), .TEMPO_FILTRO(DEBOUNCE_NOTAS)) db_notas (
@@ -50,6 +50,9 @@ module fluxo_dados #(
     debounce #(.WIDTH(1), .TEMPO_FILTRO(DEBOUNCE_MODO)) db_musica (
         .clock(clock), .reset(reset), .in(btn_musica), .out(s_btn_musica_db)
     );
+    debounce #(.WIDTH(1), .TEMPO_FILTRO(DEBOUNCE_MODO)) db_intensidade (
+        .clock(clock), .reset(reset), .in(btn_intensidade), .out(s_btn_intensidade_db)
+    );
 
     // Edge Detectors
     edge_detector ed_modo (
@@ -58,6 +61,10 @@ module fluxo_dados #(
     wire s_btn_musica_pulse;
     edge_detector ed_musica (
         .clock(clock), .reset(reset), .sinal(s_btn_musica_db), .pulso(s_btn_musica_pulse)
+    );
+    wire s_btn_intensidade_pulse;
+    edge_detector ed_intensidade (
+        .clock(clock), .reset(reset), .sinal(s_btn_intensidade_db), .pulso(s_btn_intensidade_pulse)
     );
 
     // Registrador seletor de musica transformado em contador
@@ -158,10 +165,36 @@ module fluxo_dados #(
     assign acerto_nota = s_match_cru;
 
     // 4. Modulação de Intensidade Visual (PWM) p/ Sensibilidade
+    // Contador ciclico de Estado de Intensidade (0 a 4)
+    reg [2:0] estado_intensidade;
+    always @(posedge clock or posedge reset) begin
+        if (reset) begin
+            estado_intensidade <= 3'd0; // Começa em 100%
+        end else if (s_btn_intensidade_pulse) begin
+            if (estado_intensidade == 3'd4)
+                estado_intensidade <= 3'd0;
+            else
+                estado_intensidade <= estado_intensidade + 1'b1;
+        end
+    end
+
+    // Mapeamento dos Estágios para o Duty Cycle
+    reg [3:0] s_duty_cycle;
+    always @(*) begin
+        case (estado_intensidade)
+            3'd0: s_duty_cycle = 4'hF; // 100%
+            3'd1: s_duty_cycle = 4'hC; // ~75%
+            3'd2: s_duty_cycle = 4'h8; // ~50%
+            3'd3: s_duty_cycle = 4'h4; // ~25%
+            3'd4: s_duty_cycle = 4'h0; // 0%
+            default: s_duty_cycle = 4'hF; // Fallback para 100%
+        endcase
+    end
+
     gerador_pwm pwm_inst (
         .clock(clock),
         .reset(reset),
-        .duty_cycle(sw_volume),
+        .duty_cycle(s_duty_cycle),
         .pwm_out(pwm_out)
     );
 

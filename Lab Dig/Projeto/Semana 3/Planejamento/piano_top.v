@@ -11,10 +11,10 @@ module piano_top #(
     input  [6:0] gpio_keys,     // 7 notas
     input        btn_modo,      // Troca os modos
     input        btn_musica,    // Troca as musicas
+    input        btn_intensidade, // Alterna intensidade do LED (PWM)
     
-    // Pinos futuros/atuais
+    // Pinos futuros
     // input  [1:0] sw_oitava, 
-    input  [3:0] sw_volume,     // Configura PWM do LED
 
     // Saídas Físicas
     output       buzzer,        // Sai no pino pro buzzer (Onda quadrada)
@@ -65,8 +65,8 @@ module piano_top #(
         .botoes(gpio_keys),
         .btn_modo(btn_modo),
         .btn_musica(btn_musica),
+        .btn_intensidade(btn_intensidade),
         .sw_oitava(2'd0), 
-        .sw_volume(sw_volume), // Configuracao de sensibilidade (PWM)
         .modo_aprendizado(fsm_modo_apr),
         .conta_endereco(fsm_conta_end),
         .zera_endereco(fsm_zera_end),
