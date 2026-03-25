@@ -7,5 +7,3 @@ Implementar bemol/sustenido:
 Eventualmente implementar controle de oitavas (atualmente hex1_oitava está fixo em 5)
 
 Eventualmente usar o PWM para regular o áudio do gerador_audio
-
-Implementar um PWM dos LEDs ou por hardware
