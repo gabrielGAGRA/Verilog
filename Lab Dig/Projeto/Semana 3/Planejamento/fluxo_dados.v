@@ -9,32 +9,32 @@ module fluxo_dados #(
     input        clock,
     input        reset,
 
-    // -- Entradas Físicas (Hardware) --
+    // -- Entradas Físicas  --
     input  [6:0] botoes,       // 7 notas
     input        btn_modo,     // Troca de modo
     input        btn_musica,   // Troca de musica
-    input        btn_intensidade, // Botao ciclico de Intensidade (PWM)
-    input  [1:0] sw_oitava,    // Switches de transposição
+    input        btn_intensidade, // Botao ciclico da intensidade do LED
+    input  [1:0] sw_oitava,    // Switches de aumentar/reduzir oitava
 
-    // -- Comandos da Unidade de Controle (FSM) --
+    // -- Unidade de Controle --
     input        modo_aprendizado, // 1 = Aprendizado, 0 = Livre
     input        conta_endereco,
     input        zera_endereco,
 
-    // -- Saídas Físicas (Hardware) --
+    // -- Saídas Físicas --
     output       buzzer,
     output [6:0] leds,
 
-    // -- Status para a Unidade de Controle (FSM) ou Top-Level --
+    // -- Status para a Unidade de Controle e Top-Level --
     output       mudou_modo,       // Pulso de troca de modo
-    output       tem_nota_ativa,   // Vai para 1 quando há alguma tecla pressionada
-    output       acerto_nota,      // Vai para 1 quando a nota batida for igual a nota lida na RAM
-    output       fim_musica,       // Vai para 1 quando o endereço chega no limite
-    output [10:0] s_endereco_ram,   // Exportado para visualizacao (HEX)
-    output [2:0] s_id_para_led,    // ID da nota atual para visualizacao (HEX cifrado)
-    output [1:0] out_sel_musica,   // Seletor exportado pro display
+    output       tem_nota_ativa,  
+    output       acerto_nota,      
+    output       fim_musica,       
+    output [10:0] s_endereco_ram,  
+    output [2:0] s_id_para_led,    // ID da nota atual
+    output [1:0] out_sel_musica,   // Seletor pro display
     output [6:0] db_botoes,        // Botoes debounced para os LEDs
-    output       pwm_out           // Sinal PWM para intensidade visual
+    output       pwm_out           // Sinal PWM para LED
 );
 
     wire [6:0] s_botoes_db;
@@ -67,7 +67,7 @@ module fluxo_dados #(
         .clock(clock), .reset(reset), .sinal(s_btn_intensidade_db), .pulso(s_btn_intensidade_pulse)
     );
 
-    // Registrador seletor de musica transformado em contador
+    // Registrador seletor de musica
     wire [1:0] s_sel_musica;
     contador_m #(.M(4), .N(2)) contador_musica (
         .clock(clock),
@@ -87,9 +87,9 @@ module fluxo_dados #(
     wire [17:0] s_n_ticks;
     
     wire [3:0] s_dado_ram;
-    wire [2:0] s_nota_esperada = s_dado_ram[2:0]; // Ignora o MSB, usa só 1 a 7
+    wire [2:0] s_nota_esperada = s_dado_ram[2:0];
 
-    // 1. Logica de Áudio (Tempo Real)
+    // 1. Logica de Áudio
     logica_notas_prioridade logic_inst (
         .clock(clock), .reset(reset),
         .botoes(s_botoes_db), .nota_id(s_nota_tocada), .tem_nota(s_tem_nota)
@@ -109,7 +109,7 @@ module fluxo_dados #(
     // 2. Logica de Memória e Endereçamento
     wire cont_fim;
     contador_m #(
-        .M(2048), // Tamanho da musica / ROM maximo
+        .M(2048), // Tamanho da musica maximo
         .N(11)
     ) contador_addr (
         .clock(clock),
@@ -146,9 +146,7 @@ module fluxo_dados #(
     // Mux de musicas
     assign s_dado_ram = (s_sel_musica == 2'd0) ? s_dado_ram1 : s_dado_ram2;
 
-    // Multiplexador de LEDs.
-    // No Modo Aprendizado: Mostra a nota vinda da memoria.
-    // No Modo Livre: Mostra a nota vinda do teclado (botoes).
+    // Multiplexador de LEDs: No Modo Aprendizado, mostra a nota vinda da memoria. No Modo Livre, mostra a nota vinda do teclado (botoes).
     assign s_id_para_led = (modo_aprendizado) ? s_nota_esperada : s_nota_tocada;
 
     // 3. Logica Visual e Comparação
@@ -160,11 +158,11 @@ module fluxo_dados #(
     // O sinal de match fica em nível alto enquanto a nota certa for segurada
     wire s_match_cru = (s_nota_tocada == s_nota_esperada) && s_tem_nota && modo_aprendizado;
 
-    // Exportação direta dos níveis lógicos para a máquina de estado (FSM)
+    // Exportação dos níveis lógicos para a máquina de estado
     assign tem_nota_ativa = s_tem_nota;
     assign acerto_nota = s_match_cru;
 
-    // 4. Modulação de Intensidade Visual (PWM) p/ Sensibilidade
+    // 4. Modulação de LED (PWM)
     // Contador ciclico de Estado de Intensidade (0 a 4)
     reg [2:0] estado_intensidade;
     always @(posedge clock or posedge reset) begin
@@ -178,7 +176,7 @@ module fluxo_dados #(
         end
     end
 
-    // Mapeamento dos Estágios para o Duty Cycle
+    // Mapeamento do Duty Cycle
     reg [3:0] s_duty_cycle;
     always @(*) begin
         case (estado_intensidade)

@@ -8,26 +8,26 @@ module unidade_controle (
     
     // Entradas
     input mudou_modo,       // Pulso para trocar modo
-    input tem_nota_ativa,   // 1 = Usuario esta segurando pelo menos 1 nota
-    input acerto_nota,      // 1 = A nota segurada eh a nota da RAM
-    input fim_musica,       // 1 = Quando acabarem os 16 enderecos
+    input tem_nota_ativa,   
+    input acerto_nota,      
+    input fim_musica,      
     
     // Saidas de Estado
     output reg modo_aprendizado,
     output reg zera_endereco,
     output reg conta_endereco,
-    output reg [4:0] estado_hex // Para depuracao em display 7 seg
+    output reg [4:0] estado_hex // Para depuracao
 );
 
-    // Mapeamento dos Estados da FSM (RF_MODOS / RF_MUSICA)
+    // Estados da UC
     parameter INICIAL           = 3'd0;
     parameter LIVRE             = 3'd1;
     parameter INICIA_MUSICA     = 3'd2;
-    parameter ESPERA_NOTA       = 3'd3;  // "Estado de LED" / "Aguarda acerto"
-    parameter COMPARA_NOTA      = 3'd4;  // "Estado de comparacao"
-    parameter PROXIMO           = 3'd5;  // "Avanca Endereco da ROM"
-    parameter ESPERA_SOLTAR     = 3'd6;  // Inibe que pule duas notas por toque
-    parameter FIM_MUSICA_ST     = 3'd7;  // "Estado de Fim"
+    parameter ESPERA_NOTA       = 3'd3;  // Aguarda acerto
+    parameter COMPARA_NOTA      = 3'd4;  // Compara nota tocada com a esperada
+    parameter PROXIMO           = 3'd5;  // Avanca endereco da ROM
+    parameter ESPERA_SOLTAR     = 3'd6;  // Evita que pule duas notas por toque
+    parameter FIM_MUSICA_ST     = 3'd7; 
 
     reg [2:0] state, next_state;
 
@@ -39,7 +39,7 @@ module unidade_controle (
         end
     end
 
-    // Logica de Proximo Estado e Saidas (Moore + Lógica Limpa)
+    // Logica de proximo estado e saidas
     always @(*) begin
         // Valores padrao
         next_state = state;
@@ -87,12 +87,12 @@ module unidade_controle (
                 if (mudou_modo) next_state = LIVRE;
                 else if (acerto_nota) next_state = PROXIMO;
                 else if (!tem_nota_ativa) next_state = ESPERA_NOTA; 
-                // Se errou continua aqui ouvindo ativamente o toque do Override 
+                // Se errou continua ouvindo o override 
             end
 
             PROXIMO: begin
                 modo_aprendizado = 1'b1; 
-                estado_hex = 5'h4; // Modo Proximo
+                estado_hex = 5'h4; // Modo proximo
                 conta_endereco = 1'b1; // Puxa gatilho do contador
 
                 next_state = ESPERA_SOLTAR;
@@ -100,7 +100,7 @@ module unidade_controle (
 
             ESPERA_SOLTAR: begin
                 modo_aprendizado = 1'b1;
-                estado_hex = 5'h5; // Estado Aguardando Dedo Sair
+                estado_hex = 5'h5; // Estado aguardando parar de tocar a nota
                 
                 if (mudou_modo) next_state = LIVRE;
                 else if (!tem_nota_ativa) begin

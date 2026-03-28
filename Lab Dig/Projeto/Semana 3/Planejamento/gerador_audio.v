@@ -27,7 +27,7 @@ module gerador_audio (
                 contador <= contador + 1'b1;
             end
             
-            // Define o sinal de saida (PWM)
+            // Define o sinal de saida
             s_buzzer <= (contador < threshold);
         end else begin
             contador <= 18'd0;

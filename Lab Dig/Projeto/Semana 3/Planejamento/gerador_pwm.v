@@ -2,7 +2,6 @@
 // Modulo: gerador_pwm
 // Descricao: Gera um sinal PWM com base na configuracao de duty cycle (0 a 15).
 // Frequencia do PWM baseada num clock de 50MHz: 50M / 65536 = ~762Hz
-// Evita "flicker" e permite ajustar suavidade do brilho
 // ---------------------------------------------------------------------------
 module gerador_pwm (
     input clock,
@@ -21,7 +20,6 @@ module gerador_pwm (
         end
     end
 
-    // Tratamento dos extremos e faixa linear de duty cycle
     assign pwm_out = (duty_cycle == 4'h0) ? 1'b0 :
                      (duty_cycle == 4'hF) ? 1'b1 :
                      (counter < {duty_cycle, 12'd0});

@@ -14,7 +14,12 @@ module sync_rom #(
 
     reg [DATA_WIDTH-1:0] rom [0:(2**ADDR_WIDTH)-1];
 
+\    integer i;
     initial begin
+        // Inicializa com zero
+        for (i = 0; i < (2**ADDR_WIDTH); i = i + 1) begin
+            rom[i] = {DATA_WIDTH{1'b0}};
+        end
         $readmemb(INIT_FILE, rom);
     end
 

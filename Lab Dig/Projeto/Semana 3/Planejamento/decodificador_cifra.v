@@ -13,7 +13,7 @@ module decodificador_cifra (
             3'd2: display = 7'b0100001; // Ré = d
             3'd3: display = 7'b0000110; // Mi = E
             3'd4: display = 7'b0001110; // Fá = F
-            3'd5: display = 7'b0010000; // Sol = G (Usando figura que lembra G/9)
+            3'd5: display = 7'b0010000; // Sol = G
             3'd6: display = 7'b0001000; // Lá = A
             3'd7: display = 7'b0000011; // Si = b
             default: display = 7'b1111111; // Desligado se nao houver nota

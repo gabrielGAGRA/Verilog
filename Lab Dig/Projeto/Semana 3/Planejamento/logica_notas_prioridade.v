@@ -5,8 +5,8 @@
 module logica_notas_prioridade (
     input        clock,
     input        reset,
-    input  [6:0] botoes,       // Do=0 a Si=6
-    output reg [2:0] nota_id,  // ID da nota ativa (1 a 7)
+    input  [6:0] botoes,       
+    output reg [2:0] nota_id,  // ID da nota ativa
     output       tem_nota      // Flag se alguma nota deve soar
 );
 
@@ -20,7 +20,7 @@ module logica_notas_prioridade (
         end else begin
             botoes_ant <= botoes;
 
-            // Override: Detecta borda de subida em cada botao
+            // Override em duas notas: Detecta borda de subida em cada botao
             if      (botoes[0] && !botoes_ant[0]) nota_id <= 3'd1; // Do
             else if (botoes[1] && !botoes_ant[1]) nota_id <= 3'd2; // Re
             else if (botoes[2] && !botoes_ant[2]) nota_id <= 3'd3; // Mi
@@ -29,7 +29,7 @@ module logica_notas_prioridade (
             else if (botoes[5] && !botoes_ant[5]) nota_id <= 3'd6; // La
             else if (botoes[6] && !botoes_ant[6]) nota_id <= 3'd7; // Si
             
-            // Fallback: Se a ultima nota ativa foi solta, mas outras estao pressionadas, volta para a de maior indice (comportamento previsivel)
+            // Fallback em duas notas: Se a ultima nota ativa foi solta, mas outras estao pressionadas, volta para a de maior indice
             if (tem_nota && !botoes[nota_id-1]) begin
                 if      (botoes[6]) nota_id <= 3'd7;
                 else if (botoes[5]) nota_id <= 3'd6;
