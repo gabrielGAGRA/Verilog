@@ -3,8 +3,8 @@
 // Descricao: Caminho de dados unificado para Modo Livre e Aprendizado.
 // ---------------------------------------------------------------------------
 module fluxo_dados #(
-    parameter DEBOUNCE_NOTAS = 500_000,
-    parameter DEBOUNCE_MODO  = 250_000
+    parameter DEBOUNCE_NOTAS = 100_000, // 2ms pros botoes pequenos de tecla
+    parameter DEBOUNCE_MODO  = 500_000 //10ms pros botos grandes de modo
 ) (
     input        clock,
     input        reset,
