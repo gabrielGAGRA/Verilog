@@ -38,9 +38,9 @@ module piano_top #(
     wire fsm_modo_apr, fsm_zera_end, fsm_conta_end;
     wire fd_tem_nota_ativa, fd_acerto_nota, fd_fim_musica;
     wire [4:0] dbg_estado;
-    wire [10:0] fd_endereco_ram;
+    wire [9:0] fd_endereco_ram;
     wire [2:0] fd_id_nota;
-    wire [1:0] s_sel_musica;
+    wire [3:0] s_sel_musica;
     wire [6:0] s_db_botoes;
     wire fd_mudou_modo;
     wire s_pwm_out;
@@ -103,7 +103,7 @@ module piano_top #(
 
     // HEX5: Modo atual
     hexa7seg disp5_inst (
-        .hexa(dbg_estado),
+        .hexa({4'd0, fsm_modo_apr}),
         .display(hex5_modo)
     );
 

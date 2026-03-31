@@ -32,9 +32,9 @@ module fluxo_dados #(
     output       tem_nota_ativa,  
     output       acerto_nota,      
     output       fim_musica,       
-    output [10:0] s_endereco_ram,  
+    output [9:0] s_endereco_ram,  
     output [2:0] s_id_para_led,    
-    output [1:0] out_sel_musica,   
+    output [3:0] out_sel_musica,   
     output [6:0] db_botoes,        
     output       pwm_out,
     output [2:0] oitava_atual,
@@ -88,8 +88,8 @@ module fluxo_dados #(
     edge_detector ed_oit_down (.clock(clock), .reset(reset), .sinal(s_btn_oitava_down_db), .pulso(s_btn_oitava_down_pulse));
 
     // Seletor de musica
-    wire [1:0] s_sel_musica;
-    contador_m #(.M(4), .N(2)) contador_musica (
+    wire [3:0] s_sel_musica;
+    contador_m #(.M(15), .N(4)) contador_musica (
         .clock(clock), .zera_as(1'b0), .zera_s(reset), .conta(s_btn_musica_pulse),
         .Q(s_sel_musica), .fim(), .meio()
     );
@@ -143,30 +143,39 @@ module fluxo_dados #(
 
     // 2. Logica de Memória e Endereçamento
     wire cont_fim;
-    contador_m #(.M(2048), .N(11)) contador_addr (
+    contador_m #(.M(1024), .N(10)) contador_addr (
         .clock(clock), .zera_as(1'b0), .zera_s(zera_endereco), .conta(conta_endereco),
         .Q(s_endereco_ram), .fim(cont_fim), .meio()
     );
 
-    wire [6:0] s_dado_ram1, s_dado_ram2;
+    wire [6:0] d_ram0, d_ram1, d_ram2, d_ram3, d_ram4, d_ram5, d_ram6, d_ram7;
+    wire [6:0] d_ram8, d_ram9, d_ram10, d_ram11, d_ram12, d_ram13, d_ram14;
 
-    sync_rom #(
-        .DATA_WIDTH(7),
-        .ADDR_WIDTH(11),
-        .INIT_FILE("Musicas/do_re_mi.txt")
-    ) memoria1 (
-        .clock(clock), .address(s_endereco_ram), .data_out(s_dado_ram1)
+    sync_rom #(.DATA_WIDTH(7), .ADDR_WIDTH(10), .INIT_FILE("Musicas/do_re_mi.txt")) mem0 (.clock(clock), .address(s_endereco_ram), .data_out(d_ram0));
+    sync_rom #(.DATA_WIDTH(7), .ADDR_WIDTH(10), .INIT_FILE("Musicas/zelda.txt"))    mem1 (.clock(clock), .address(s_endereco_ram), .data_out(d_ram1));
+    sync_rom #(.DATA_WIDTH(7), .ADDR_WIDTH(10), .INIT_FILE("Musicas/Spiderman.txt")) mem2 (.clock(clock), .address(s_endereco_ram), .data_out(d_ram2));
+    sync_rom #(.DATA_WIDTH(7), .ADDR_WIDTH(10), .INIT_FILE("Musicas/au_clair_de_la_lune.txt")) mem3 (.clock(clock), .address(s_endereco_ram), .data_out(d_ram3));
+    sync_rom #(.DATA_WIDTH(7), .ADDR_WIDTH(10), .INIT_FILE("Musicas/bad_romance.txt")) mem4 (.clock(clock), .address(s_endereco_ram), .data_out(d_ram4));
+    sync_rom #(.DATA_WIDTH(7), .ADDR_WIDTH(10), .INIT_FILE("Musicas/do_i_wanna_know.txt")) mem5 (.clock(clock), .address(s_endereco_ram), .data_out(d_ram5));
+    sync_rom #(.DATA_WIDTH(7), .ADDR_WIDTH(10), .INIT_FILE("Musicas/golden.txt")) mem6 (.clock(clock), .address(s_endereco_ram), .data_out(d_ram6));
+    sync_rom #(.DATA_WIDTH(7), .ADDR_WIDTH(10), .INIT_FILE("Musicas/golden_wind.txt")) mem7 (.clock(clock), .address(s_endereco_ram), .data_out(d_ram7));
+    sync_rom #(.DATA_WIDTH(7), .ADDR_WIDTH(10), .INIT_FILE("Musicas/harry_potter.txt")) mem8 (.clock(clock), .address(s_endereco_ram), .data_out(d_ram8));
+    sync_rom #(.DATA_WIDTH(7), .ADDR_WIDTH(10), .INIT_FILE("Musicas/minecraft.txt")) mem9 (.clock(clock), .address(s_endereco_ram), .data_out(d_ram9));
+    sync_rom #(.DATA_WIDTH(7), .ADDR_WIDTH(10), .INIT_FILE("Musicas/minecraft2.txt")) mem10 (.clock(clock), .address(s_endereco_ram), .data_out(d_ram10));
+    sync_rom #(.DATA_WIDTH(7), .ADDR_WIDTH(10), .INIT_FILE("Musicas/miranha.txt")) mem11 (.clock(clock), .address(s_endereco_ram), .data_out(d_ram11));
+    sync_rom #(.DATA_WIDTH(7), .ADDR_WIDTH(10), .INIT_FILE("Musicas/sans.txt")) mem12 (.clock(clock), .address(s_endereco_ram), .data_out(d_ram12));
+    sync_rom #(.DATA_WIDTH(7), .ADDR_WIDTH(10), .INIT_FILE("Musicas/take_on_me.txt")) mem13 (.clock(clock), .address(s_endereco_ram), .data_out(d_ram13));
+    sync_rom #(.DATA_WIDTH(7), .ADDR_WIDTH(10), .INIT_FILE("Musicas/Interestelar.txt")) mem14 (.clock(clock), .address(s_endereco_ram), .data_out(d_ram14));
+
+    mux_musicas seletor_musicas_inst (
+        .sel(s_sel_musica),
+        .d0(d_ram0), .d1(d_ram1), .d2(d_ram2), .d3(d_ram3),
+        .d4(d_ram4), .d5(d_ram5), .d6(d_ram6), .d7(d_ram7),
+        .d8(d_ram8), .d9(d_ram9), .d10(d_ram10), .d11(d_ram11),
+        .d12(d_ram12), .d13(d_ram13), .d14(d_ram14),
+        .out(s_dado_ram)
     );
 
-    sync_rom #(
-        .DATA_WIDTH(7),
-        .ADDR_WIDTH(11),
-        .INIT_FILE("Musicas/zelda.txt")
-    ) memoria2 (
-        .clock(clock), .address(s_endereco_ram), .data_out(s_dado_ram2)
-    );
-
-    assign s_dado_ram = (s_sel_musica == 2'd0) ? s_dado_ram1 : s_dado_ram2;
     assign s_id_para_led = (modo_aprendizado) ? s_nota_esperada : s_nota_tocada;
 
     // 3. Logica Visual e Comparação
