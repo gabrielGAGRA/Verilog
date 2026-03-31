@@ -51,7 +51,7 @@ module tb_piano_top;
         .hex0_sustenido(hex0_sustenido)
     );
 
-    // Clock gen 50MHz (periodo 20ns)
+    // Clock 50MHz (periodo 20ns)
     always #10 CLOCK_50 = ~CLOCK_50;
 
     // Reaproveitado do tb da semana 1 para medição de frequência gerada
@@ -133,10 +133,6 @@ module tb_piano_top;
         $display("Mudando para Modo Aprendizado...");
         btn_modo = 0; #100 btn_modo = 1; #200; 
 
-        // Tinha musica escolhida? Tenta tocar primeira nota de Acerto!
-        // A musica 1 (do_re_mi) deve exigir certas oitavas (verificar no txt real)
-        // Se zelda.txt esta na rom, o primeiro eh 100 0 100 => oitava 4, nao sustenido, fa (4)
-        // Vamos apenas enviar os sinais em sequencia para simular mudancas
         $display("Teste Inicial finalizado. Finalizando...");
         $finish;
     end

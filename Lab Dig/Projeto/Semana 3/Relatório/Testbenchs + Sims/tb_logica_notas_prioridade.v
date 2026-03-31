@@ -17,7 +17,7 @@ module tb_logica_notas_prioridade;
         .tem_nota(tem_nota)
     );
 
-    // Clock generation
+    // Clock
     always #10 clock = ~clock;
 
     initial begin

@@ -14,7 +14,7 @@ module tb_gerador_pwm;
         .pwm_out(pwm_out)
     );
 
-    // Clock gen 50MHz (periodo 20ns)
+    // Clock 50MHz (periodo 20ns)
     always #10 clock = ~clock;
 
     initial begin
