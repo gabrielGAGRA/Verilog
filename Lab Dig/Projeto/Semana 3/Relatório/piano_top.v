@@ -97,7 +97,7 @@ module piano_top #(
     );
 
     // Mapeamento extra de LEDs físicos
-    assign led_sustenido = s_sustenido_atual;
+    assign led_sustenido = fsm_modo_apr ? s_sustenido_atual : 1'b0;
 
     // DECODIFICADORES PARA DISPLAYS (RF_STATUS_HEX)
 
@@ -109,7 +109,7 @@ module piano_top #(
 
     // HEX4: Oitava atual / esperada
     hexa7seg disp4_inst (
-        .hexa({1'b0, s_oitava_atual}), 
+        .hexa({2'b00, s_oitava_atual}), 
         .display(hex4_oitava)
     );
 
@@ -136,7 +136,8 @@ module piano_top #(
     );
 
     // Multiplexador para acender LED vermelho (indicador da base selecionada/nota base do Cifra)
-    wire [6:0] raw_led = (fsm_modo_apr && fd_id_nota != 0) ? (7'b0000001 << (fd_id_nota - 1)) : s_db_botoes;
+    // No modo livre os LEDs de nota não acendem. Somente no modo Aprendizado.
+    wire [6:0] raw_led = (fsm_modo_apr && fd_id_nota != 0) ? (7'b0000001 << (fd_id_nota - 1)) : 7'b0000000;
     
     // Mascara com PWM para alterar itensidade
     assign led_vermelho = raw_led & {7{s_pwm_out}};

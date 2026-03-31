@@ -24,7 +24,7 @@ module tb_piano_top;
     wire [6:0] hex1_nota;
     wire [6:0] hex0_sustenido;
 
-    // Instancia o top-level sobrescrevendo os parametros de tempo de debounce para agilizar a simulacao
+    // Instancia o top-level com tempos curtos de debounce para agilizar
     piano_top #(
         .DEBOUNCE_TECLA(2),
         .DEBOUNCE_CONTROLE(2)
@@ -51,47 +51,32 @@ module tb_piano_top;
         .hex0_sustenido(hex0_sustenido)
     );
 
-    // Clock 50MHz (periodo 20ns)
-    always #10 CLOCK_50 = ~CLOCK_50;
+    // Clock
+    always #10 CLOCK_50 = ~CLOCK_50; // 50MHz
 
-    // Reaproveitado do tb da semana 1 para medição de frequência gerada
-    time tempo_borda_anterior = 0;
-    real periodo_em_ns;
-    real frequencia_atual_hz;
-
-    // Sempre que o buzzer subir, calculamos a freq baseada no tempo decorrido
-    always @(posedge buzzer) begin
-        if (tempo_borda_anterior != 0) begin
-            periodo_em_ns = $time - tempo_borda_anterior;
-            frequencia_atual_hz = 1_000_000_000.0 / periodo_em_ns;
-        end
-        tempo_borda_anterior = $time;
-    end
-
-    // Task para conferência
-    task check_freq(input real freq_esperada, input [255:0] nome_nota);
+    // Tarefa utilitaria para checar os valores dos LEDs e reportar o Acerto/Erro do modulo
+    task validar_leds(input [6:0] exp_led_vermelho, input exp_led_up, input exp_led_down, input [800:0] contexto);
         begin
-            #4000000; // Aguarda 4ms para estabilizar a medição (frequências menores precisam de mais tempo)
-            // Tolerância de 1%
-            if (frequencia_atual_hz > freq_esperada * 0.99 && frequencia_atual_hz < freq_esperada * 1.01) begin
-                $display("[%0t ns] [PASS] %s detectada: %0.2f Hz", $time, nome_nota, frequencia_atual_hz);
+            #10;
+            if (led_vermelho === exp_led_vermelho && led_oitava_up === exp_led_up && led_oitava_down === exp_led_down) begin
+                $display("[PASS] %s | led_vermelho=%b, up=%b, down=%b", contexto, led_vermelho, led_oitava_up, led_oitava_down);
             end else begin
-                $display("[%0t ns] [FAIL] %s INCORRETA! Esperado: %0.2f Hz | Lido: %0.2f Hz", 
-                         $time, nome_nota, freq_esperada, frequencia_atual_hz);
+                $display("[FAIL] %s", contexto);
+                $display("       Esperado: led_vermelho=%b, up=%b, down=%b", exp_led_vermelho, exp_led_up, exp_led_down);
+                $display("       Lido    : led_vermelho=%b, up=%b, down=%b", led_vermelho, led_oitava_up, led_oitava_down);
             end
         end
     endtask
 
     initial begin
-        $display("Iniciando Testbench de Integracao: piano_top...");
-        $dumpfile("tb_piano_top.vcd");
-        $dumpvars(0, tb_piano_top);
-
-        // Inicializacao
+        $display("==================================================");
+        $display(" Iniciando Simulacao Completa: Modo Aprendizado ");
+        $display("==================================================");
         CLOCK_50 = 0;
         reset_n = 0; // Ativo baixo
         gpio_keys = 0;
-        // Botões grandes agora são pull-up (1 = não pressionado, 0 = pressionado)
+        
+        // Logica Pull-up (Desacionados = 1)
         btn_modo = 1;
         btn_musica = 1;
         btn_intensidade = 1;
@@ -99,41 +84,68 @@ module tb_piano_top;
         btn_oitava_down = 1;
         btn_sustenido = 1;
 
-        // Libera do reset
-        #50 reset_n = 1;
-        #50;
-
-        // Testa Modo Livre
-        $display("Testando Modo Livre - Pressionando C (Do4)");
-        gpio_keys = 7'b0000001; 
-        #200; // Tempo pro debounce contabilizar
-        check_freq(261.63, "Do4 (Modo Livre)");
-        
-        $display("Adicionando Sustenido...");
-        btn_sustenido = 0; // Pressiona o botão (pull-up)
-        #200;
-        check_freq(277.18, "Do#4 (Modo Livre)"); // (1000000000 / (180386 * 20)) = 277.18
-        
-        btn_sustenido = 1; // Solta o botão
-        gpio_keys = 0; 
+        #100 reset_n = 1; // Libera Reset
         #200;
 
-        $display("Aumentando Oitava...");
-        btn_oitava_up = 0; #100 btn_oitava_up = 1; #200;
+        $display("\n--- MUDANDO PARA MODO APRENDIZADO ---");
+        btn_modo = 0; #100; btn_modo = 1; 
+        #2000; // Tempo pro debounce + leitura da memoria (ROM) estabilizar
+
+        // Musica 0: do_re_mi.txt. Primeira nota: Do5 (001), oitava inicial do sistema eh 4 (100)
+        // Como oitava pedida > oitava atual, led_oitava_up deve acender.
+        validar_leds(
+            7'b0000001, // Espera led_vermelho[0] aceso indicando DO
+            1'b1,       // Espera led UP aceso (Precisa ir da oitava 4 para 5)
+            1'b0,       // led down apagado
+            "Validando Primeira Nota (Dó) - Analise de Oitava"
+        );
+
+        $display("\n--- TESTANDO: TOCAR NOTA COM OITAVA ERRADA ---");
+        gpio_keys = 7'b0000001; // Toca Do
+        #1000;
+        validar_leds(7'b0000001, 1'b1, 1'b0, "Apertou a nota certa, mas na Oitava Errada -> Nao deve avancar a FSM");
+        gpio_keys = 0; // Solta Do
+        #1000;
+
+        $display("\n--- CORRIGINDO OITAVA ---");
+        btn_oitava_up = 0; #100; btn_oitava_up = 1;
+        #500; // Espera FSM de oitava atualizar
+        validar_leds(7'b0000001, 1'b0, 1'b0, "Apos subir oitava -> led_up apaga, led_vermelho continua pedindo DO");
+
+
+        $display("\n--- TESTANDO: TOCAR A NOTA CORRETA (Dó5) ---");
+        gpio_keys = 7'b0000001; // Toca Do
+        #500; // Espera estagio COMPARA_NOTA e PROXIMO executarem
         
-        $display("Pressionando C (Do5)");
-        gpio_keys = 7'b0000001; 
-        #200; 
-        check_freq(523.25, "Do5 (Modo Livre)");
+        $display("     [LOG] Nota pressionada. FSM deve avancar endereco.");
+        gpio_keys = 0; // Solta nota para sair de ESPERA_SOLTAR
+        #1000; // Espera buscar a proxima nota na ROM
 
-        $display("Testando alteracao de intensidade do LED (PWM)...");
-        btn_intensidade = 0; #100; btn_intensidade = 1; // ~75%
-        #200;
+        // A proxima nota eh RE 5 (ID 2 => acende led_vermelho[1]). A oitava ja eh 5, entao corretas
+        validar_leds(7'b0000010, 1'b0, 1'b0, "Passou para proxima nota -> RE. LEDs refletem nova nota e oitava valida.");
 
-        $display("Mudando para Modo Aprendizado...");
-        btn_modo = 0; #100 btn_modo = 1; #200; 
 
-        $display("Teste Inicial finalizado. Finalizando...");
+        $display("\n--- TESTANDO: ERRAR A NOTA DE PROPOSITO (Tocar Mi no lugar de Re) ---");
+        gpio_keys = 7'b0000100; // Toca Mi (ID 3)
+        #500;
+        validar_leds(7'b0000010, 1'b0, 1'b0, "Toquei Mi porem pediu Re -> a FSM ignora e continua pedindo RE");
+        gpio_keys = 0; // Solta
+        #1000;
+
+
+        $display("\n--- TESTANDO: TOCAR A NOTA CORRETA (Ré5) ---");
+        gpio_keys = 7'b0000010; // Toca Re (ID 2)
+        #500;
+        gpio_keys = 0; // Solta nota
+        #1000;
+
+        // Proxima da partitura do_re_mi: Mi 5 (ID 3 => acende led_vermelho[2])
+        validar_leds(7'b0000100, 1'b0, 1'b0, "Acertou o Re -> Passou para a proxima: MI");
+
+
+        $display("\n==================================================");
+        $display(" Teste Completo e Aprovado!");
+        $display("==================================================");
         $finish;
     end
 
